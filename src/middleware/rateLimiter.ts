@@ -3,7 +3,7 @@ import rateLimit from "../config/upstash.js";
 
 const rateLimiter = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const { success } = await rateLimit.limit(req.ip || "unknown"); // should be done per user OR IP Address
+		const { success } = await rateLimit.limit(req.ip || "unknown"); // Should be done per user OR IP Address
 		if (!success) {
 			return res
 				.status(429)

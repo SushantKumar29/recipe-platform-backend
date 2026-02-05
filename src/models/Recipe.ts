@@ -9,54 +9,50 @@ const recipeSchema = new mongoose.Schema(
 			minlength: 3,
 			maxlength: 100,
 		},
-
 		ingredients: {
 			type: String,
 			required: true,
 			trim: true,
 		},
-
 		steps: {
 			type: String,
 			required: true,
 			trim: true,
 		},
-
 		image: {
 			type: String,
 			required: false,
 		},
-
 		author: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
 		},
-
 		isPublished: {
 			type: Boolean,
-			default: false,
-		},
-
-		ratings: {
-			type: Number,
-			min: 0,
-			max: 5,
-			default: 0,
-			set: (v: number) => Math.round(v * 10) / 10,
+			default: true,
 		},
 	},
-	{ timestamps: true },
+	{
+		timestamps: true,
+		toJSON: { virtuals: true },
+		toObject: { virtuals: true },
+	},
 );
 
 recipeSchema.virtual("comments", {
 	ref: "Comment",
 	localField: "_id",
 	foreignField: "recipe",
+	justOne: false,
 });
 
-recipeSchema.set("toJSON", { virtuals: true });
-recipeSchema.set("toObject", { virtuals: true });
+recipeSchema.virtual("ratings", {
+	ref: "Rating",
+	localField: "_id",
+	foreignField: "recipe",
+	justOne: false,
+});
 
 recipeSchema.index({ title: "text" });
 recipeSchema.index({ createdAt: -1 });

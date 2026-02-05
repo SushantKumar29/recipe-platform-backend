@@ -26,7 +26,6 @@ const commentSchema = new mongoose.Schema(
 	{ timestamps: true },
 );
 
-// Helpful indexes
 commentSchema.index({ recipe: 1, createdAt: -1 });
 commentSchema.index({ author: 1 });
 

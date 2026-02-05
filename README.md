@@ -14,6 +14,7 @@ This is the backend for the recipe platform application. It is built using Node.
 - JWT (JSON Web Tokens) – Authentication & authorization
 - bcrypt – Secure password hashing
 - Upstash Redis – Rate limiting and API protection
+- Swagger – API documentation
 
 ## Responsibilities
 
@@ -92,14 +93,12 @@ cd recipe-platform-backend
 
 ```
 npm install
-
 ```
 
 3. Run the Development Server
 
 ```
 npm run dev
-
 ```
 
 ## Server URL

@@ -24,7 +24,7 @@ export const signup = async (
 		const token = createSecretToken(user._id);
 		res.cookie("token", token, {});
 
-		res.status(200).json({ message: "Signup successful", user });
+		res.status(200).json({ message: "Signup successful", user, token });
 	} catch (error) {
 		next(error);
 	}
@@ -53,7 +53,7 @@ export const login = async (
 		}
 		const token = createSecretToken(user._id);
 		res.cookie("token", token, {});
-		res.status(201).json({ message: "Login successful", user });
+		res.status(201).json({ message: "Login successful", user, token });
 	} catch (error) {
 		next(error);
 	}
