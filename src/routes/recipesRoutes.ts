@@ -6,8 +6,13 @@ import {
 	updateRecipe,
 	deleteRecipe,
 	rateRecipe,
+	addCommentToRecipe,
+	fetchRecipeComments,
 } from "../controllers/recipesController.js";
 import { requireAuth } from "../middleware/auth.js";
+import { checkOwnership } from "../middleware/ownership.ts";
+import Recipe from "../models/Recipe.ts";
+import { uploadSingleImage } from "../middleware/upload.ts";
 
 const router = express.Router();
 
@@ -26,9 +31,6 @@ const router = express.Router();
  *         - title
  *         - ingredients
  *         - steps
- *         - isPublished
- *         - author
- *         - image
  *       properties:
  *         title:
  *           type: string
@@ -39,14 +41,9 @@ const router = express.Router();
  *         steps:
  *           type: string
  *           description: Steps to prepare the recipe
- *         isPublished:
- *           type: boolean
- *           description: Whether the recipe is published or not
- *         author:
- *           type: string
- *           description: ID of the user who created the recipe
  *         image:
  *           type: string
+ *           format: binary
  *           description: URL of the image for the recipe
  */
 
@@ -57,75 +54,47 @@ const router = express.Router();
  *     summary: Fetch recipes with filtering, pagination, and sorting
  *     tags: [Recipes]
  *     parameters:
- *       - in: query
- *         name: search
+ *       - name: search
+ *         in: query
  *         schema:
  *           type: string
  *         description: Search term to filter recipes by title or description
- *       - in: query
- *         name: authorId
+ *       - name: authorId
+ *         in: query
  *         schema:
  *           type: string
  *         description: Filter recipes by author ID
- *       - in: query
- *         name: page
+ *       - name: page
+ *         in: query
  *         schema:
  *           type: integer
  *           default: 1
  *         description: Page number for pagination
- *       - in: query
- *         name: limit
+ *       - name: limit
+ *         in: query
  *         schema:
  *           type: integer
  *           default: 10
  *         description: Number of items per page
- *       - in: query
- *         name: sortBy
+ *       - name: sortBy
+ *         in: query
  *         schema:
  *           type: string
  *           enum: [createdAt, updatedAt, title, rating]
  *           default: createdAt
  *         description: Field to sort recipes by
- *       - in: query
- *         name: sortOrder
+ *       - name: sortOrder
+ *         in: query
  *         schema:
  *           type: string
- *           enum: [asc, desc]
  *           default: desc
  *         description: Sort order (ascending or descending)
  *     responses:
  *       200:
- *         description: A paginated list of recipes with ratings
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Recipe'
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     page:
- *                       type: integer
- *                       description: Current page number
- *                     limit:
- *                       type: integer
- *                       description: Number of items per page
- *                     total:
- *                       type: integer
- *                       description: Total number of items
- *                     pages:
- *                       type: integer
- *                       description: Total number of pages
- *       401:
- *         description: Unauthorized
+ *         description: List of recipes with ratings
  *       500:
  *         description: Internal server error
  */
-
 router.get("/", fetchRecipes);
 
 /**
@@ -144,17 +113,46 @@ router.get("/", fetchRecipes);
  *     responses:
  *       200:
  *         description: A single recipe
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Recipe'
  *       404:
  *         description: Recipe not found
- *       401:
- *         description: Unauthorized
  */
-
 router.get("/:id", fetchRecipe);
+
+/**
+ * @swagger
+ * /recipes/{id}/comments:
+ *   get:
+ *     summary: Get paginated comments for a recipe
+ *     tags: [Recipes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *       - name: page
+ *         in: query
+ *         default: 1
+ *       - name: limit
+ *         in: query
+ *         default: 10
+ *       - name: sortBy
+ *         in: query
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, updatedAt]
+ *           default: createdAt
+ *       - name: sortOrder
+ *         in: query
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *     responses:
+ *       200:
+ *         description: Comments retrieved successfully
+ *       404:
+ *         description: Recipe not found
+ */
+router.get("/:id/comments", fetchRecipeComments);
 
 /**
  * @swagger
@@ -167,25 +165,28 @@ router.get("/:id", fetchRecipe);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
- *             $ref: '#/components/schemas/Recipe'
+ *             type: object
+ *             required:
+ *               - title
+ *               - ingredients
+ *               - steps
+ *             properties:
+ *               title:
+ *                 type: string
+ *               ingredients:
+ *                 type: string
+ *               steps:
+ *                 type: string
+ *               image:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       201:
  *         description: Recipe created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Recipe'
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
  */
-
-router.post("/", requireAuth, createRecipe);
+router.post("/", requireAuth, uploadSingleImage, createRecipe);
 
 /**
  * @swagger
@@ -205,25 +206,30 @@ router.post("/", requireAuth, createRecipe);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
- *             $ref: '#/components/schemas/Recipe'
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               ingredients:
+ *                 type: string
+ *               steps:
+ *                 type: string
+ *               image:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       200:
  *         description: Recipe updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Recipe'
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
  */
-
-router.put("/:id", requireAuth, updateRecipe);
+router.put(
+	"/:id",
+	requireAuth,
+	checkOwnership(Recipe),
+	uploadSingleImage,
+	updateRecipe,
+);
 
 /**
  * @swagger
@@ -244,12 +250,11 @@ router.put("/:id", requireAuth, updateRecipe);
  *       200:
  *         description: Recipe removed successfully
  *       401:
- *         description: Not authenticated
+ *         description: Unauthorized
  *       404:
  *         description: Recipe not found
  */
-
-router.delete("/:id", requireAuth, deleteRecipe);
+router.delete("/:id", requireAuth, checkOwnership(Recipe), deleteRecipe);
 
 /**
  * @swagger
@@ -274,23 +279,58 @@ router.delete("/:id", requireAuth, deleteRecipe);
  *             type: object
  *             required:
  *               - value
- *               - authorId
  *             properties:
  *               value:
  *                 type: number
  *                 minimum: 0.5
  *                 maximum: 5
- *               authorId:
- *                 type: string
  *     responses:
  *       200:
  *         description: Rating added successfully
  *       400:
  *         description: Bad request or already rated
+ *       401:
+ *         description: Unauthorized
  *       404:
  *         description: Recipe not found
  */
-
 router.post("/:id/rate", requireAuth, rateRecipe);
+
+/**
+ * @swagger
+ * /recipes/{id}/comments:
+ *   post:
+ *     summary: Add comment to recipe
+ *     tags: [Recipes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - content
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Comment added successfully
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Recipe not found
+ */
+router.post("/:id/comments", requireAuth, addCommentToRecipe);
 
 export default router;

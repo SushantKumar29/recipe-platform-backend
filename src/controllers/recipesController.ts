@@ -1,14 +1,13 @@
 import type { Request, Response, NextFunction } from "express";
-import { Types } from "mongoose";
 import Recipe from "../models/Recipe.js";
 import Rating from "../models/Rating.js";
 import Comment from "../models/Comment.js";
-
 import {
 	getFilteredQuery,
 	getPaginatedRecipes,
 	addRatingsToRecipes,
 } from "../utils/recipes/recipeUtils.ts";
+import cloudinary from "../config/cloudinary.ts";
 
 export const fetchRecipes = async (
 	req: Request,
@@ -41,10 +40,8 @@ export const fetchRecipes = async (
 			sortOrder as string,
 		);
 
-		const recipesWithRatings = await addRatingsToRecipes(recipes);
-
 		res.status(200).json({
-			data: recipesWithRatings,
+			data: recipes,
 			pagination: {
 				page: pageNum,
 				limit: limitNum,
@@ -69,14 +66,6 @@ export const fetchRecipe = async (
 			.populate({
 				path: "author",
 				select: "name email",
-			})
-			.populate({
-				path: "comments",
-				options: { sort: { createdAt: -1 } },
-				populate: {
-					path: "author",
-					select: "name email",
-				},
 			})
 			.populate({
 				path: "ratings",
@@ -121,27 +110,65 @@ export const createRecipe = async (
 	next: NextFunction,
 ) => {
 	try {
-		const { title, ingredients, steps, image, author } = req.body;
+		const { title, ingredients, steps } = req.body;
+		const userId = res.locals.user.id;
 
-		if (!title || !ingredients || !steps || !author) {
-			return res.status(400).json({
-				message: "All fields are required",
-			});
+		if (!title || !ingredients || !steps) {
+			return res.status(400).json({ message: "All fields are required" });
+		}
+
+		let imageData = {
+			url: "",
+			publicId: "",
+		};
+
+		if (req.file) {
+			try {
+				const uploadResult = await new Promise<any>((resolve, reject) => {
+					const uploadStream = cloudinary.uploader.upload_stream(
+						{
+							folder: "recipes",
+							resource_type: "image",
+							transformation: [
+								{ width: 1200, height: 800, crop: "limit" },
+								{ quality: "auto:good" },
+							],
+						},
+						(error, result) => {
+							if (error) reject(error);
+							else resolve(result);
+						},
+					);
+
+					uploadStream.end(req.file!.buffer);
+				});
+
+				imageData = {
+					url: uploadResult.secure_url,
+					publicId: uploadResult.public_id,
+				};
+			} catch (uploadError) {
+				console.error("Cloudinary upload error:", uploadError);
+				return res.status(500).json({
+					message: "Failed to upload image to Cloudinary",
+				});
+			}
 		}
 
 		const newRecipe = new Recipe({
 			title,
 			ingredients,
 			steps,
-			image,
-			author,
+			image: imageData,
+			author: userId,
 		});
 
 		const savedRecipe = await newRecipe.save();
 
-		res
-			.status(201)
-			.json({ message: "Recipe created successfully", recipe: savedRecipe });
+		res.status(201).json({
+			message: "Recipe created successfully",
+			recipe: savedRecipe,
+		});
 	} catch (error) {
 		next(error);
 	}
@@ -154,15 +181,77 @@ export const updateRecipe = async (
 ) => {
 	try {
 		const { id } = req.params;
+		const { title, ingredients, steps } = req.body;
+		const userId = res.locals.user.id;
 
-		const updatedRecipe = await Recipe.findByIdAndUpdate(id, req.body, {
-			new: true,
-			runValidators: true,
-		});
-
-		if (!updatedRecipe) {
+		const existingRecipe = await Recipe.findById(id);
+		if (!existingRecipe) {
 			return res.status(404).json({ message: "Recipe not found" });
 		}
+
+		if (existingRecipe.author.toString() !== userId) {
+			return res.status(403).json({
+				message: "You are not authorized to update this recipe",
+			});
+		}
+
+		let imageData = existingRecipe.image;
+
+		if (req.file) {
+			if (imageData?.publicId) {
+				try {
+					await cloudinary.uploader.destroy(imageData.publicId);
+				} catch (deleteError) {
+					console.error("Error deleting old image:", deleteError);
+				}
+			}
+
+			try {
+				const uploadResult = await new Promise<any>((resolve, reject) => {
+					const uploadStream = cloudinary.uploader.upload_stream(
+						{
+							folder: "recipes",
+							resource_type: "image",
+							transformation: [
+								{ width: 1200, height: 800, crop: "limit" },
+								{ quality: "auto:good" },
+							],
+						},
+						(error, result) => {
+							if (error) reject(error);
+							else resolve(result);
+						},
+					);
+
+					uploadStream.end(req.file!.buffer);
+				});
+
+				imageData = {
+					url: uploadResult.secure_url,
+					publicId: uploadResult.public_id,
+				};
+			} catch (uploadError) {
+				console.error("Cloudinary upload error:", uploadError);
+				return res.status(500).json({
+					message: "Failed to upload image to Cloudinary",
+				});
+			}
+		}
+
+		const updateData: any = {
+			title: title || existingRecipe.title,
+			ingredients: ingredients || existingRecipe.ingredients,
+			steps: steps || existingRecipe.steps,
+			image: imageData,
+		};
+
+		const updatedRecipe = await Recipe.findByIdAndUpdate(id, updateData, {
+			new: true,
+			runValidators: true,
+		}).populate({
+			path: "author",
+			select: "name email",
+		});
 
 		res.status(200).json({
 			message: "Recipe updated successfully",
@@ -180,18 +269,37 @@ export const deleteRecipe = async (
 ) => {
 	try {
 		const { id } = req.params;
+		const userId = res.locals.user.id;
+		const recipeId = id as string;
 
-		const deletedRecipe = await Recipe.findByIdAndDelete(id);
+		const recipe = await Recipe.findById(id);
+		if (!recipe) {
+			return res.status(404).json({ message: "Recipe not found" });
+		}
+
+		if (recipe.author.toString() !== userId) {
+			return res.status(403).json({
+				message: "You are not authorized to delete this recipe",
+			});
+		}
+
+		if (recipe?.image?.publicId) {
+			try {
+				await cloudinary.uploader.destroy(recipe.image.publicId);
+			} catch (deleteError) {
+				console.error("Error deleting image from Cloudinary:", deleteError);
+			}
+		}
+
+		const [deletedRecipe] = await Promise.all([
+			Recipe.findByIdAndDelete(id),
+			Comment.deleteMany({ recipe: recipeId }),
+			Rating.deleteMany({ recipe: recipeId }),
+		]);
 
 		if (!deletedRecipe) {
 			return res.status(404).json({ message: "Recipe not found" });
 		}
-
-		const recipeId = new Types.ObjectId(id as string);
-		await Promise.all([
-			Comment.deleteMany({ recipe: recipeId }),
-			Rating.deleteMany({ recipe: recipeId }),
-		]);
 
 		res.status(200).json({
 			message: "Recipe deleted successfully",
@@ -208,11 +316,13 @@ export const rateRecipe = async (
 ) => {
 	try {
 		const { id } = req.params;
-		const { value, authorId } = req.body;
-		const recipeId = new Types.ObjectId(id as string);
+		const { value } = req.body;
 
-		if (!value || !authorId) {
-			return res.status(400).json({ message: "Value and author required" });
+		const authorId = res.locals.user.id;
+		const recipeId = id as string;
+
+		if (!value) {
+			return res.status(400).json({ message: "Value is required" });
 		}
 
 		const recipe = await Recipe.findById(recipeId);
@@ -242,6 +352,98 @@ export const rateRecipe = async (
 		res.status(200).json({
 			message: "Recipe rated successfully",
 			rating,
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
+export const fetchRecipeComments = async (
+	req: Request,
+	res: Response,
+	next: NextFunction,
+) => {
+	try {
+		const { id } = req.params;
+		const recipeId = id as string;
+		const {
+			page = "1",
+			limit = "10",
+			sortBy = "createdAt",
+			sortOrder = "desc",
+		} = req.query;
+
+		const pageNum = Math.max(1, parseInt(page as string));
+		const limitNum = Math.max(1, parseInt(limit as string));
+		const offset = (pageNum - 1) * limitNum;
+
+		const sortField = ["createdAt", "updatedAt", "rating"].includes(
+			sortBy as string,
+		)
+			? (sortBy as string)
+			: "createdAt";
+		const sortDir = sortOrder === "asc" ? 1 : -1;
+
+		const [comments, totalComments] = await Promise.all([
+			Comment.find({ recipe: recipeId })
+				.sort({ [sortField]: sortDir })
+				.skip(offset)
+				.limit(limitNum)
+				.populate("author", "name email"),
+			Comment.countDocuments({ recipe: recipeId }),
+		]);
+
+		const totalPages = Math.ceil(totalComments / limitNum);
+
+		res.json({
+			comments,
+			pagination: {
+				page: pageNum,
+				totalPages,
+				totalComments,
+				hasNext: pageNum < totalPages,
+				hasPrev: pageNum > 1,
+				limit: limitNum,
+			},
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
+export const addCommentToRecipe = async (
+	req: Request,
+	res: Response,
+	next: NextFunction,
+) => {
+	try {
+		const { id } = req.params;
+		const { content } = req.body;
+		const userId = res.locals.user.id;
+
+		if (!content) {
+			return res.status(400).json({ message: "Content is required" });
+		}
+
+		const recipe = await Recipe.findById(id);
+		if (!recipe) {
+			return res.status(404).json({ message: "Recipe not found" });
+		}
+
+		const comment = await Comment.create({
+			recipe: id as string,
+			content,
+			author: userId,
+		});
+
+		const populatedComment = await Comment.findById(comment._id).populate(
+			"author",
+			"name email",
+		);
+
+		res.status(201).json({
+			message: "Comment added successfully",
+			comment: populatedComment,
 		});
 	} catch (error) {
 		next(error);

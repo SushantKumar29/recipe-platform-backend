@@ -45,6 +45,28 @@ export const getPaginatedRecipes = async (
 	sortOrder: string,
 ) => {
 	const offset = (page - 1) * limit;
+
+	if (sortBy === "rating") {
+		const allRecipes = await Recipe.find(query)
+			.populate("author", "name email")
+			.lean();
+
+		const recipesWithRatings = await addRatingsToRecipes(
+			allRecipes as unknown as IRecipe[],
+		);
+
+		recipesWithRatings.sort((a, b) => {
+			const ratingA = a.averageRating || 0;
+			const ratingB = b.averageRating || 0;
+			return sortOrder === "asc" ? ratingA - ratingB : ratingB - ratingA;
+		});
+
+		const paginatedRecipes = recipesWithRatings.slice(offset, offset + limit);
+		const total = allRecipes.length;
+
+		return { recipes: paginatedRecipes, total };
+	}
+
 	const sort: any = {};
 	sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
@@ -57,7 +79,11 @@ export const getPaginatedRecipes = async (
 
 	const total = await Recipe.countDocuments(query);
 
-	return { recipes: recipes as unknown as IRecipe[], total };
+	const recipesWithRatings = await addRatingsToRecipes(
+		recipes as unknown as IRecipe[],
+	);
+
+	return { recipes: recipesWithRatings, total };
 };
 
 export const addRatingsToRecipes = async (recipes: IRecipe[]) => {

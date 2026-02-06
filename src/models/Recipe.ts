@@ -20,8 +20,14 @@ const recipeSchema = new mongoose.Schema(
 			trim: true,
 		},
 		image: {
-			type: String,
-			required: false,
+			url: {
+				type: String,
+				default: "",
+			},
+			publicId: {
+				type: String,
+				default: "",
+			},
 		},
 		author: {
 			type: mongoose.Schema.Types.ObjectId,

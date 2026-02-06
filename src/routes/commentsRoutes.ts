@@ -1,10 +1,11 @@
 import express from "express";
 import {
-	createComment,
 	deleteComment,
 	updateComment,
 } from "../controllers/commentsController.js";
 import { requireAuth } from "../middleware/auth.js";
+import { checkOwnership } from "../middleware/ownership.ts";
+import Comment from "../models/Comment.ts";
 
 const router = express.Router();
 
@@ -37,37 +38,6 @@ const router = express.Router();
 
 /**
  * @swagger
- * /comments:
- *   post:
- *     summary: Create a new comment
- *     tags: [Comments]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Comment'
- *     responses:
- *       201:
- *         description: Comment created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Comment'
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
- */
-
-router.post("/", requireAuth, createComment);
-
-/**
- * @swagger
  * /comments/{id}:
  *   put:
  *     summary: Update a comment
@@ -90,10 +60,6 @@ router.post("/", requireAuth, createComment);
  *     responses:
  *       200:
  *         description: Comment updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Comment'
  *       400:
  *         description: Bad request
  *       401:
@@ -101,7 +67,7 @@ router.post("/", requireAuth, createComment);
  *       500:
  *         description: Internal server error
  */
-router.put("/:id", requireAuth, updateComment);
+router.put("/:id", requireAuth, checkOwnership(Comment), updateComment);
 
 /**
  * @swagger
@@ -126,6 +92,6 @@ router.put("/:id", requireAuth, updateComment);
  *       404:
  *         description: Comment not found
  */
-router.delete("/:id", requireAuth, deleteComment);
+router.delete("/:id", requireAuth, checkOwnership(Comment), deleteComment);
 
 export default router;
