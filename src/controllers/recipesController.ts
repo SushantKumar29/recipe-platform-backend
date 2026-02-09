@@ -3,9 +3,8 @@ import Recipe from "../models/Recipe.js";
 import Rating from "../models/Rating.js";
 import Comment from "../models/Comment.js";
 import {
-	getFilteredQuery,
+	buildFilteredQuery,
 	getPaginatedRecipes,
-	addRatingsToRecipes,
 } from "../utils/recipes/recipeUtils.ts";
 import cloudinary from "../config/cloudinary.ts";
 
@@ -18,6 +17,8 @@ export const fetchRecipes = async (
 		const {
 			search,
 			authorId,
+			preparationTime,
+			minRating,
 			page = "1",
 			limit = "10",
 			sortBy = "createdAt",
@@ -27,9 +28,11 @@ export const fetchRecipes = async (
 		const pageNum = parseInt(page as string) || 1;
 		const limitNum = parseInt(limit as string) || 10;
 
-		const query = await getFilteredQuery({
+		const query = await buildFilteredQuery({
 			search: search as string,
 			authorId: authorId as string,
+			preparationTime: preparationTime as string,
+			minRating: minRating as string,
 		});
 
 		const { recipes, total } = await getPaginatedRecipes(
@@ -110,11 +113,13 @@ export const createRecipe = async (
 	next: NextFunction,
 ) => {
 	try {
-		const { title, ingredients, steps } = req.body;
+		const { title, ingredients, steps, preparationTime } = req.body;
 		const userId = res.locals.user.id;
 
-		if (!title || !ingredients || !steps) {
-			return res.status(400).json({ message: "All fields are required" });
+		if (!title || !ingredients || !steps || !preparationTime) {
+			return res.status(400).json({
+				message: "All fields are required",
+			});
 		}
 
 		let imageData = {
@@ -159,6 +164,7 @@ export const createRecipe = async (
 			title,
 			ingredients,
 			steps,
+			preparationTime: parseInt(preparationTime),
 			image: imageData,
 			author: userId,
 		});
@@ -181,7 +187,7 @@ export const updateRecipe = async (
 ) => {
 	try {
 		const { id } = req.params;
-		const { title, ingredients, steps } = req.body;
+		const { title, ingredients, steps, preparationTime } = req.body;
 		const userId = res.locals.user.id;
 
 		const existingRecipe = await Recipe.findById(id);
@@ -242,6 +248,9 @@ export const updateRecipe = async (
 			title: title || existingRecipe.title,
 			ingredients: ingredients || existingRecipe.ingredients,
 			steps: steps || existingRecipe.steps,
+			preparationTime: preparationTime
+				? parseInt(preparationTime)
+				: existingRecipe.preparationTime,
 			image: imageData,
 		};
 

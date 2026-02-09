@@ -19,6 +19,12 @@ const recipeSchema = new mongoose.Schema(
 			required: true,
 			trim: true,
 		},
+		preparationTime: {
+			type: Number,
+			required: true,
+			min: 1,
+			max: 1440,
+		},
 		image: {
 			url: {
 				type: String,
@@ -60,6 +66,7 @@ recipeSchema.virtual("ratings", {
 	justOne: false,
 });
 
+recipeSchema.index({ preparationTime: 1 });
 recipeSchema.index({ title: "text" });
 recipeSchema.index({ createdAt: -1 });
 

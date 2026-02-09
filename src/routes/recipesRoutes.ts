@@ -64,6 +64,21 @@ const router = express.Router();
  *         schema:
  *           type: string
  *         description: Filter recipes by author ID
+ *       - name: preparationTime
+ *         in: query
+ *         description: Filter by preparation time range
+ *         schema:
+ *           type: string
+ *           enum: [0-30, 30-60, 60-120, 120+]
+ *           example: "0-30"
+ *       - name: minRating
+ *         in: query
+ *         description: Minimum average rating (1-5)
+ *         schema:
+ *           type: number
+ *           minimum: 1
+ *           maximum: 5
+ *           example: 4
  *       - name: page
  *         in: query
  *         schema:
@@ -172,6 +187,7 @@ router.get("/:id/comments", fetchRecipeComments);
  *               - title
  *               - ingredients
  *               - steps
+ *               - preparationTime
  *             properties:
  *               title:
  *                 type: string
@@ -179,6 +195,11 @@ router.get("/:id/comments", fetchRecipeComments);
  *                 type: string
  *               steps:
  *                 type: string
+ *               preparationTime:
+ *                 type: integer
+ *                 description: (in minutes)
+ *                 minimum: 1
+ *                 maximum: 1440
  *               image:
  *                 type: string
  *                 format: binary
@@ -216,6 +237,11 @@ router.post("/", requireAuth, uploadSingleImage, createRecipe);
  *                 type: string
  *               steps:
  *                 type: string
+ *               preparationTime:
+ *                 type: integer
+ *                 description: (in minutes)
+ *                 minimum: 1
+ *                 maximum: 1440
  *               image:
  *                 type: string
  *                 format: binary
@@ -294,6 +320,7 @@ router.delete("/:id", requireAuth, checkOwnership(Recipe), deleteRecipe);
  *       404:
  *         description: Recipe not found
  */
+
 router.post("/:id/rate", requireAuth, rateRecipe);
 
 /**
