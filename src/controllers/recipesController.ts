@@ -7,6 +7,7 @@ import {
 	getPaginatedRecipes,
 } from "../utils/recipes/recipeUtils.ts";
 import cloudinary from "../config/cloudinary.ts";
+import { normalizeTextList } from "../lib/formatter.ts";
 
 export const fetchRecipes = async (
 	req: Request,
@@ -117,15 +118,13 @@ export const createRecipe = async (
 		const userId = res.locals.user.id;
 
 		if (!title || !ingredients || !steps || !preparationTime) {
-			return res.status(400).json({
-				message: "All fields are required",
-			});
+			return res.status(400).json({ message: "All fields are required" });
 		}
 
-		let imageData = {
-			url: "",
-			publicId: "",
-		};
+		const normalizedIngredients = normalizeTextList(ingredients);
+		const normalizedSteps = normalizeTextList(steps);
+
+		let imageData = { url: "", publicId: "" };
 
 		if (req.file) {
 			try {
@@ -144,16 +143,14 @@ export const createRecipe = async (
 							else resolve(result);
 						},
 					);
-
-					uploadStream.end(req.file!.buffer);
+					uploadStream.end(req.file?.buffer);
 				});
 
 				imageData = {
 					url: uploadResult.secure_url,
 					publicId: uploadResult.public_id,
 				};
-			} catch (uploadError) {
-				console.error("Cloudinary upload error:", uploadError);
+			} catch {
 				return res.status(500).json({
 					message: "Failed to upload image to Cloudinary",
 				});
@@ -162,9 +159,9 @@ export const createRecipe = async (
 
 		const newRecipe = new Recipe({
 			title,
-			ingredients,
-			steps,
-			preparationTime: parseInt(preparationTime),
+			ingredients: normalizedIngredients,
+			steps: normalizedSteps,
+			preparationTime: Number(preparationTime),
 			image: imageData,
 			author: userId,
 		});
@@ -179,7 +176,6 @@ export const createRecipe = async (
 		next(error);
 	}
 };
-
 export const updateRecipe = async (
 	req: Request,
 	res: Response,
@@ -207,8 +203,8 @@ export const updateRecipe = async (
 			if (imageData?.publicId) {
 				try {
 					await cloudinary.uploader.destroy(imageData.publicId);
-				} catch (deleteError) {
-					console.error("Error deleting old image:", deleteError);
+				} catch (err) {
+					console.error("Error deleting old image:", err);
 				}
 			}
 
@@ -229,15 +225,14 @@ export const updateRecipe = async (
 						},
 					);
 
-					uploadStream.end(req.file!.buffer);
+					uploadStream.end(req.file?.buffer);
 				});
 
 				imageData = {
 					url: uploadResult.secure_url,
 					publicId: uploadResult.public_id,
 				};
-			} catch (uploadError) {
-				console.error("Cloudinary upload error:", uploadError);
+			} catch {
 				return res.status(500).json({
 					message: "Failed to upload image to Cloudinary",
 				});
@@ -246,8 +241,8 @@ export const updateRecipe = async (
 
 		const updateData: any = {
 			title: title || existingRecipe.title,
-			ingredients: ingredients || existingRecipe.ingredients,
-			steps: steps || existingRecipe.steps,
+			ingredients: normalizeTextList(ingredients ?? existingRecipe.ingredients),
+			steps: normalizeTextList(steps ?? existingRecipe.steps),
 			preparationTime: preparationTime
 				? parseInt(preparationTime)
 				: existingRecipe.preparationTime,
@@ -257,10 +252,7 @@ export const updateRecipe = async (
 		const updatedRecipe = await Recipe.findByIdAndUpdate(id, updateData, {
 			new: true,
 			runValidators: true,
-		}).populate({
-			path: "author",
-			select: "name email",
-		});
+		}).populate("author", "name email");
 
 		res.status(200).json({
 			message: "Recipe updated successfully",

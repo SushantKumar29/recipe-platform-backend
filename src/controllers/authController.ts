@@ -49,7 +49,7 @@ export const login = async (
 
 		const auth = await bcrypt.compare(password, user.password);
 		if (!auth) {
-			return res.json({ message: "Invalid credentials" });
+			return res.status(401).json({ message: "Invalid credentials" });
 		}
 		const token = createSecretToken(user._id);
 		res.cookie("token", token, {});

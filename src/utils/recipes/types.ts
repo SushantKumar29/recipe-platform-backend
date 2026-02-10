@@ -16,8 +16,8 @@ export interface IRating {
 export interface IRecipe {
 	_id: string;
 	title: string;
-	ingredients: string;
-	steps: string;
+	ingredients: string[];
+	steps: string[];
 	image?: string;
 	author: string | IUser;
 	isPublished: boolean;
