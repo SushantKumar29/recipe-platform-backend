@@ -176,6 +176,7 @@ export const createRecipe = async (
 		next(error);
 	}
 };
+
 export const updateRecipe = async (
 	req: Request,
 	res: Response,
@@ -350,7 +351,7 @@ export const rateRecipe = async (
 
 		await rating.save();
 
-		res.status(200).json({
+		res.status(201).json({
 			message: "Recipe rated successfully",
 			rating,
 		});
@@ -396,7 +397,7 @@ export const fetchRecipeComments = async (
 
 		const totalPages = Math.ceil(totalComments / limitNum);
 
-		res.json({
+		res.status(200).json({
 			comments,
 			pagination: {
 				page: pageNum,

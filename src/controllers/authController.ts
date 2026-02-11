@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import User from "../models/User.js";
-import { createSecretToken } from "../lib/secretToken.ts";
+import { createSecretToken } from "../lib/secretToken.js";
 import bcrypt from "bcrypt";
 
 export const signup = async (
@@ -22,10 +22,15 @@ export const signup = async (
 		const user = await User.create({ name, email, password });
 
 		const token = createSecretToken(user._id);
-		res.cookie("token", token, {});
+		res.cookie("token", token, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			sameSite: "strict",
+		});
 
-		res.status(200).json({ message: "Signup successful", user, token });
+		res.status(201).json({ message: "Signup successful", user, token });
 	} catch (error) {
+		console.error("Signup error:", error);
 		next(error);
 	}
 };
@@ -52,9 +57,14 @@ export const login = async (
 			return res.status(401).json({ message: "Invalid credentials" });
 		}
 		const token = createSecretToken(user._id);
-		res.cookie("token", token, {});
-		res.status(201).json({ message: "Login successful", user, token });
+		res.cookie("token", token, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			sameSite: "strict",
+		});
+		res.status(200).json({ message: "Login successful", user, token });
 	} catch (error) {
+		console.error("Login error:", error);
 		next(error);
 	}
 };

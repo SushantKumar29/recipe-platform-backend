@@ -13,7 +13,7 @@
 		"lib": ["ES2022"],
 
 		/* Node Environment */
-		"types": ["node"],
+		"types": ["node", "jest"],
 
 		/* Output */
 		"sourceMap": true,
@@ -30,7 +30,8 @@
 		"isolatedModules": true,
 
 		/* Performance */
-		"skipLibCheck": true
+		"skipLibCheck": true,
+		"esModuleInterop": true
 	},
 
 	"include": ["src/**/*.ts"],
