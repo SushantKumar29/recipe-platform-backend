@@ -9,6 +9,7 @@ import {
 import cloudinary from "../config/cloudinary.ts";
 import { normalizeTextList } from "../lib/formatter.ts";
 import type { IRating, IRecipe } from "../utils/recipes/types.ts";
+import type { UploadApiResponse } from "cloudinary";
 
 export const fetchRecipes = async (
 	req: Request,
@@ -79,7 +80,7 @@ export const fetchRecipe = async (
 			return res.status(404).json({ message: "Recipe not found" });
 		}
 
-		const recipeObj = recipe.toObject() as any;
+		const recipeObj = recipe.toObject() as IRecipe;
 		const ratings = (recipeObj.ratings || []) as IRating[];
 		const ratingCount = ratings.length;
 
@@ -118,27 +119,35 @@ export const createRecipe = async (
 		const normalizedIngredients = normalizeTextList(ingredients);
 		const normalizedSteps = normalizeTextList(steps);
 
-		let imageData = { url: "", publicId: "" };
+		let imageData: { url: string; publicId: string } = {
+			url: "",
+			publicId: "",
+		};
 
 		if (req.file) {
 			try {
-				const uploadResult = await new Promise<any>((resolve, reject) => {
-					const uploadStream = cloudinary.uploader.upload_stream(
-						{
-							folder: "recipes",
-							resource_type: "image",
-							transformation: [
-								{ width: 1200, height: 800, crop: "limit" },
-								{ quality: "auto:good" },
-							],
-						},
-						(error, result) => {
-							if (error) reject(error);
-							else resolve(result);
-						},
-					);
-					uploadStream.end(req.file?.buffer);
-				});
+				const uploadResult = await new Promise<UploadApiResponse>(
+					(resolve, reject) => {
+						const uploadStream = cloudinary.uploader.upload_stream(
+							{
+								folder: "recipes",
+								resource_type: "image",
+								transformation: [
+									{ width: 1200, height: 800, crop: "limit" },
+									{ quality: "auto:good" },
+								],
+							},
+							(error, result) => {
+								if (error) return reject(error);
+								if (!result)
+									return reject(new Error("No result from Cloudinary"));
+								resolve(result);
+							},
+						);
+
+						uploadStream.end(req?.file?.buffer);
+					},
+				);
 
 				imageData = {
 					url: uploadResult.secure_url,
@@ -192,7 +201,8 @@ export const updateRecipe = async (
 			});
 		}
 
-		let imageData = existingRecipe.image;
+		let imageData: { url: string; publicId: string } | null =
+			existingRecipe.image ?? null;
 
 		if (req.file) {
 			if (imageData?.publicId) {
@@ -204,24 +214,28 @@ export const updateRecipe = async (
 			}
 
 			try {
-				const uploadResult = await new Promise<any>((resolve, reject) => {
-					const uploadStream = cloudinary.uploader.upload_stream(
-						{
-							folder: "recipes",
-							resource_type: "image",
-							transformation: [
-								{ width: 1200, height: 800, crop: "limit" },
-								{ quality: "auto:good" },
-							],
-						},
-						(error, result) => {
-							if (error) reject(error);
-							else resolve(result);
-						},
-					);
+				const uploadResult = await new Promise<UploadApiResponse>(
+					(resolve, reject) => {
+						const uploadStream = cloudinary.uploader.upload_stream(
+							{
+								folder: "recipes",
+								resource_type: "image",
+								transformation: [
+									{ width: 1200, height: 800, crop: "limit" },
+									{ quality: "auto:good" },
+								],
+							},
+							(error, result) => {
+								if (error) return reject(error);
+								if (!result)
+									return reject(new Error("No result from Cloudinary"));
+								resolve(result);
+							},
+						);
 
-					uploadStream.end(req.file?.buffer);
-				});
+						uploadStream.end(req?.file?.buffer);
+					},
+				);
 
 				imageData = {
 					url: uploadResult.secure_url,

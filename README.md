@@ -11,6 +11,7 @@ This is the backend for the recipe platform application. It is built using Node.
 - TypeScript – Static typing for better maintainability
 - MongoDB – NoSQL database
 - Mongoose – MongoDB object modeling
+- Cloudinary – Image hosting
 - JWT (JSON Web Tokens) – Authentication & authorization
 - bcrypt – Secure password hashing
 - Upstash Redis – Rate limiting and API protection
@@ -40,10 +41,12 @@ Recipes
 - GET /api/v1/recipes/:id – Fetch a recipe by ID
 - PATCH /api/v1/recipes/:id – Update a recipe (authenticated, owner only)
 - DELETE /api/v1/recipes/:id – Delete a recipe (authenticated, owner only)
+- GET api/v1/recipes/{id}/comments – Get paginated comments for a recipe
+- POST api/v1/recipes/{id}/comments – Add comment to recipe (authenticated)
+- POST api/v1/recipes/{id}/rate – Rate a recipe (authenticated)
 
 Comments
 
-- POST /api/v1/comments – Add a comment to a recipe (authenticated)
 - PATCH /api/v1/comments/:id – Update a comment (authenticated, owner only)
 - DELETE /api/v1/comments/:id – Delete a comment (authenticated, owner only)
 
@@ -52,8 +55,12 @@ Comments
 Users must be logged in to:
 
 - Create recipes
+- Update recipe (owner only)
+- Delete recipe (owner only)
 - Rate recipes
 - Comment on recipes
+- Update comments (owner only)
+- Delete comments (owner only)
 
 Guests can view recipes only
 
@@ -70,6 +77,10 @@ ACCESS_TOKEN=your_jwt_secret
 
 UPSTASH_REDIS_REST_URL=your_upstash_redis_url
 UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_token
+
+CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
 
 # Variable Description
@@ -79,6 +90,7 @@ ACCESS_TOKEN – Secret key for signing JWTs
 PORT – Server port (default: 3000)
 NODE_ENV – Application environment
 UPSTASH_REDIS_REST_URL / TOKEN – Used for rate limiting
+CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET – Cloudinary credentials (for image upload)
 
 ## Getting Started
 
@@ -101,6 +113,12 @@ npm install
 npm run dev
 ```
 
+4. Test the API
+
+```
+npm run test
+```
+
 ## Server URL
 
 The backend server will be available at:
@@ -109,18 +127,26 @@ The backend server will be available at:
 http://localhost:3000
 ```
 
+The Swagger Documentation will vi accessible at:
+
+```
+http://localhost:3000/api-docs/
+```
+
 ## Project Structure (Overview)
 
 - src/ – Application source code
-  - controllers/ – Request handlers
-  - routes/ – API route definitions
-  - models/ – Mongoose schemas
-  - middlewares/ – Auth, error handling, rate limiting
-  - utils/ – Helpers and utilities
   - config/ – Environment and database configuration
+  - controllers/ – Request handlers
+  - lib/ – Utility functions (like formatters and token creation)
+  - middlewares/ – Auth, error handling, rate limiting
+  - models/ – Mongoose schemas
+  - routes/ – API route definitions
+  - utils/ – Helpers and utilities
+- tests/ – Integration tests
 
 ## Notes
 
-Ensure MongoDB and Upstash credentials are correctly configured.
+Ensure MongoDB, Upstash and Cloudinary credentials are correctly configured.
 This backend is designed to work with the Recipe Platform Frontend.
 Node.js v18+ is recommended for best compatibility.

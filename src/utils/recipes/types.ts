@@ -1,7 +1,7 @@
 import type { Types } from "mongoose";
 
 export interface IUser {
-	_id: string;
+	_id: Types.ObjectId | string;
 	name: string;
 	email: string;
 }
@@ -16,15 +16,15 @@ export interface IRating {
 }
 
 export interface IRecipe {
-	_id: string;
+	_id: Types.ObjectId | string;
 	title: string;
 	ingredients: string[];
 	steps: string[];
 	preparationTime: number;
-	author: string | IUser;
+	author: string | Types.ObjectId | IUser;
 	isPublished: boolean;
-	createdAt: string;
-	updatedAt: string;
+	createdAt: NativeDate | string;
+	updatedAt: NativeDate | string;
 	ratingCount?: number;
 	averageRating?: number;
 	image?: string | { url: string; publicId: string } | null;
