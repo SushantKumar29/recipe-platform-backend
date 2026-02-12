@@ -23,26 +23,33 @@ const upload = multer({
 	},
 }).any();
 
+interface MulterError extends Error {
+	code?: string;
+}
+
 export const uploadSingleImage = (
 	req: Request,
 	res: Response,
 	next: NextFunction,
 ) => {
-	upload(req, res, (err: any) => {
+	upload(req, res, (err: unknown) => {
 		if (err) {
-			if (err.code === "LIMIT_FILE_SIZE") {
+			const multerError = err as MulterError;
+
+			if (multerError.code === "LIMIT_FILE_SIZE") {
 				return res.status(400).json({
 					message: "File size too large. Maximum size is 10MB",
 				});
 			}
 
 			return res.status(400).json({
-				message: err.message || "Error uploading file",
+				message: multerError.message || "Error uploading file",
 			});
 		}
 
-		if ((req as any).files && (req as any).files.length > 0) {
-			req.file = (req as any).files[0];
+		const multerReq = req as Express.Request & { files: Express.Multer.File[] };
+		if (multerReq.files && multerReq.files.length > 0) {
+			multerReq.file = multerReq.files[0];
 		}
 
 		next();

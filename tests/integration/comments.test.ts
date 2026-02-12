@@ -1,5 +1,4 @@
-// tests/integration/comments.test.ts
-import request from "supertest";
+import request, { Test } from "supertest";
 import { describe, it, expect, beforeAll } from "@jest/globals";
 import mongoose from "mongoose";
 import app from "../../src/app";
@@ -11,7 +10,6 @@ describe("Comments API", () => {
 	let commentId: string;
 
 	beforeAll(async () => {
-		// Create two users
 		const user1Res = await request(app)
 			.post("/api/v1/auth/signup")
 			.send({
@@ -39,7 +37,6 @@ describe("Comments API", () => {
 		user1Token = user1Res.body.token;
 		user2Token = user2Res.body.token;
 
-		// Create a recipe with user1
 		const recipeRes = await request(app)
 			.post("/api/v1/recipes")
 			.set("Cookie", `token=${user1Token}`)
@@ -59,7 +56,6 @@ describe("Comments API", () => {
 		expect(recipeRes.status).toBe(201);
 		recipeId = recipeRes.body.recipe._id;
 
-		// Create a comment with user1
 		const commentRes = await request(app)
 			.post(`/api/v1/recipes/${recipeId}/comments`)
 			.set("Cookie", `token=${user1Token}`)
@@ -75,8 +71,7 @@ describe("Comments API", () => {
 		commentId = commentRes.body.comment._id;
 	});
 
-	// Helper function to set auth headers
-	const setAuth = (req: any, token: string) => {
+	const setAuth = (req: Test, token: string) => {
 		req.set("Cookie", `token=${token}`);
 		req.set("Authorization", `Bearer ${token}`);
 		return req;
@@ -84,7 +79,6 @@ describe("Comments API", () => {
 
 	describe("PUT /api/v1/comments/:id - Update comment", () => {
 		it("should update comment when user is the owner", async () => {
-			// Create a fresh comment for this test
 			const freshCommentRes = await setAuth(
 				request(app).post(`/api/v1/recipes/${recipeId}/comments`),
 				user1Token,
@@ -112,7 +106,6 @@ describe("Comments API", () => {
 				message: res.body?.message,
 			});
 
-			// Could be 200 (success) or 404 (if comment was already deleted)
 			if (res.status === 200) {
 				expect(res.body.message).toBe("Comment updated successfully");
 				expect(res.body.comment.content).toBe("Updated comment content");
@@ -122,7 +115,6 @@ describe("Comments API", () => {
 		});
 
 		it("should return 400 if content is missing", async () => {
-			// Create fresh comment
 			const freshCommentRes = await setAuth(
 				request(app).post(`/api/v1/recipes/${recipeId}/comments`),
 				user1Token,
@@ -138,14 +130,13 @@ describe("Comments API", () => {
 			const res = await setAuth(
 				request(app).put(`/api/v1/comments/${freshCommentId}`),
 				user1Token,
-			).send({}); // Empty content
+			).send({});
 
 			console.log("Update without content:", {
 				status: res.status,
 				message: res.body?.message,
 			});
 
-			// Should be 400, but could be 404 if something went wrong
 			if (res.status === 400) {
 				expect(res.body.message).toBe("Content is required");
 			} else {
@@ -154,7 +145,6 @@ describe("Comments API", () => {
 		});
 
 		it("should return 400 if content is empty", async () => {
-			// Create fresh comment
 			const freshCommentRes = await setAuth(
 				request(app).post(`/api/v1/recipes/${recipeId}/comments`),
 				user1Token,
@@ -170,7 +160,7 @@ describe("Comments API", () => {
 			const res = await setAuth(
 				request(app).put(`/api/v1/comments/${freshCommentId}`),
 				user1Token,
-			).send({ content: "" }); // Empty string
+			).send({ content: "" });
 
 			console.log("Update with empty content:", {
 				status: res.status,
@@ -202,7 +192,6 @@ describe("Comments API", () => {
 		});
 
 		it("should return 403 if user is not the owner", async () => {
-			// Create a new comment with user1
 			const newCommentRes = await setAuth(
 				request(app).post(`/api/v1/recipes/${recipeId}/comments`),
 				user1Token,
@@ -220,7 +209,6 @@ describe("Comments API", () => {
 
 			const newCommentId = newCommentRes.body.comment._id;
 
-			// Try to update with user2 (not the owner)
 			const res = await setAuth(
 				request(app).put(`/api/v1/comments/${newCommentId}`),
 				user2Token,
@@ -231,7 +219,6 @@ describe("Comments API", () => {
 				message: res.body?.message,
 			});
 
-			// Should be 403, but could be 401 if auth fails
 			expect([403, 401]).toContain(res.status);
 		});
 
@@ -249,7 +236,6 @@ describe("Comments API", () => {
 		});
 
 		it("should reject content that is too long (> 500 characters)", async () => {
-			// Create fresh comment
 			const freshCommentRes = await setAuth(
 				request(app).post(`/api/v1/recipes/${recipeId}/comments`),
 				user1Token,
@@ -272,7 +258,6 @@ describe("Comments API", () => {
 				status: res.status,
 			});
 
-			// Could be 400 (validation), 500 (server error), or 404
 			expect([400, 500, 404]).toContain(res.status);
 		});
 
@@ -296,14 +281,12 @@ describe("Comments API", () => {
 					"Failed to update with max length content, status:",
 					res.status,
 				);
-				// Don't fail the test if validation is stricter
 			}
 		});
 	});
 
 	describe("DELETE /api/v1/comments/:id - Delete comment", () => {
 		it("should delete comment when user is the owner", async () => {
-			// Create a new comment to delete
 			const newCommentRes = await setAuth(
 				request(app).post(`/api/v1/recipes/${recipeId}/comments`),
 				user1Token,
@@ -356,7 +339,6 @@ describe("Comments API", () => {
 		});
 
 		it("should return 403 if user is not the owner", async () => {
-			// Create a comment with user1
 			const newCommentRes = await setAuth(
 				request(app).post(`/api/v1/recipes/${recipeId}/comments`),
 				user1Token,
@@ -374,7 +356,6 @@ describe("Comments API", () => {
 
 			const testCommentId = newCommentRes.body.comment._id;
 
-			// Try to delete with user2 (not the owner)
 			const res = await setAuth(
 				request(app).delete(`/api/v1/comments/${testCommentId}`),
 				user2Token,
@@ -385,7 +366,6 @@ describe("Comments API", () => {
 				message: res.body?.message,
 			});
 
-			// Should be 403, but could be 401 if auth fails
 			expect([403, 401]).toContain(res.status);
 		});
 

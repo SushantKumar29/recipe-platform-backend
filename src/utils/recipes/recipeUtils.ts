@@ -1,7 +1,12 @@
 import { Types } from "mongoose";
 import Recipe from "../../models/Recipe.ts";
 import Rating from "../../models/Rating.ts";
-import type { IRecipe, IRating } from "./types.ts";
+import type {
+	IRecipe,
+	IRating,
+	IRecipeQuery,
+	IFilteredQueryParams,
+} from "./types.ts";
 import User from "../../models/User.ts";
 
 export const buildFilteredQuery = async ({
@@ -9,13 +14,8 @@ export const buildFilteredQuery = async ({
 	authorId,
 	preparationTime,
 	minRating,
-}: {
-	search?: string;
-	authorId?: string;
-	preparationTime?: string;
-	minRating?: string;
-}) => {
-	const query: any = { isPublished: true };
+}: IFilteredQueryParams): Promise<IRecipeQuery> => {
+	const query: IRecipeQuery = { isPublished: true };
 
 	if (authorId) {
 		query.author = new Types.ObjectId(authorId);
@@ -63,7 +63,7 @@ export const buildFilteredQuery = async ({
 };
 
 export const getPaginatedRecipes = async (
-	query: any,
+	query: IRecipeQuery,
 	page: number,
 	limit: number,
 	sortBy: string,
@@ -97,7 +97,7 @@ export const getPaginatedRecipes = async (
 		return { recipes: paginatedRecipes, total };
 	}
 
-	const sort: any = {};
+	const sort: Record<string, 1 | -1> = {};
 	sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
 	const recipes = await Recipe.find(recipeQuery)

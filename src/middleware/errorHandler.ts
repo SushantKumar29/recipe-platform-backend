@@ -1,9 +1,15 @@
-// src/middleware/errorHandler.ts
 import type { Request, Response, NextFunction } from "express";
-import { Error } from "mongoose";
+
+interface ErrorWithStatus extends Error {
+	statusCode?: number;
+	code?: number;
+	errors?: Record<string, { message: string }>;
+	path?: string;
+	value?: unknown;
+}
 
 export const errorHandler = (
-	error: any,
+	error: ErrorWithStatus,
 	req: Request,
 	res: Response,
 	next: NextFunction,
@@ -22,8 +28,8 @@ export const errorHandler = (
 
 	if (error.name === "ValidationError") {
 		statusCode = 400;
-		message = Object.values(error.errors)
-			.map((err: any) => err.message)
+		message = Object.values(error.errors || {})
+			.map((err) => err.message)
 			.join(", ");
 	} else if (error.name === "CastError") {
 		statusCode = 400;

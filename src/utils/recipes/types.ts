@@ -1,3 +1,5 @@
+import type { Types } from "mongoose";
+
 export interface IUser {
 	_id: string;
 	name: string;
@@ -18,12 +20,30 @@ export interface IRecipe {
 	title: string;
 	ingredients: string[];
 	steps: string[];
-	image?: string;
+	preparationTime: number;
 	author: string | IUser;
 	isPublished: boolean;
 	createdAt: string;
 	updatedAt: string;
+	ratingCount?: number;
+	averageRating?: number;
+	image?: string | { url: string; publicId: string } | null;
 	__v?: number;
-	ratingCount: number;
-	averageRating: number;
+	ratings?: IRating[];
+}
+
+export interface IFilteredQueryParams {
+	search?: string;
+	authorId?: string;
+	preparationTime?: string;
+	minRating?: string;
+}
+
+export interface IRecipeQuery {
+	isPublished: boolean;
+	author?: Types.ObjectId;
+	$or?: Array<Record<string, unknown>>;
+	preparationTime?: { $gte?: number; $lte?: number };
+	minRating?: number;
+	[key: string]: unknown;
 }

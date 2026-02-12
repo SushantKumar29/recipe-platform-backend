@@ -8,6 +8,7 @@ import {
 } from "../utils/recipes/recipeUtils.ts";
 import cloudinary from "../config/cloudinary.ts";
 import { normalizeTextList } from "../lib/formatter.ts";
+import type { IRating, IRecipe } from "../utils/recipes/types.ts";
 
 export const fetchRecipes = async (
 	req: Request,
@@ -67,17 +68,11 @@ export const fetchRecipe = async (
 		const { id } = req.params;
 
 		const recipe = await Recipe.findById(id)
-			.populate({
-				path: "author",
-				select: "name email",
-			})
+			.populate("author", "name email")
 			.populate({
 				path: "ratings",
 				options: { sort: { createdAt: -1 } },
-				populate: {
-					path: "author",
-					select: "name email",
-				},
+				populate: { path: "author", select: "name email" },
 			});
 
 		if (!recipe) {
@@ -85,18 +80,17 @@ export const fetchRecipe = async (
 		}
 
 		const recipeObj = recipe.toObject() as any;
-
-		const ratings = (recipeObj.ratings as any[]) || [];
+		const ratings = (recipeObj.ratings || []) as IRating[];
 		const ratingCount = ratings.length;
 
-		let averageRating = 0;
-		if (ratingCount > 0) {
-			const sum = ratings.reduce(
-				(total: number, rating: any) => total + rating.value,
-				0,
-			);
-			averageRating = parseFloat((sum / ratingCount).toFixed(1));
-		}
+		const averageRating =
+			ratingCount > 0
+				? parseFloat(
+						(
+							ratings.reduce((sum, r) => sum + r.value, 0) / ratingCount
+						).toFixed(1),
+					)
+				: 0;
 
 		res.status(200).json({
 			...recipeObj,
@@ -240,7 +234,7 @@ export const updateRecipe = async (
 			}
 		}
 
-		const updateData: any = {
+		const updateData = {
 			title: title || existingRecipe.title,
 			ingredients: normalizeTextList(ingredients ?? existingRecipe.ingredients),
 			steps: normalizeTextList(steps ?? existingRecipe.steps),
@@ -422,6 +416,7 @@ export const addCommentToRecipe = async (
 		const { id } = req.params;
 		const { content } = req.body;
 		const userId = res.locals.user.id;
+		const recipeId = id as string;
 
 		if (!content) {
 			return res.status(400).json({ message: "Content is required" });
@@ -430,6 +425,17 @@ export const addCommentToRecipe = async (
 		const recipe = await Recipe.findById(id);
 		if (!recipe) {
 			return res.status(404).json({ message: "Recipe not found" });
+		}
+
+		const existingComment = await Comment.findOne({
+			recipe: recipeId,
+			author: userId,
+		});
+
+		if (existingComment) {
+			return res
+				.status(400)
+				.json({ message: "You have already commented on this recipe" });
 		}
 
 		const comment = await Comment.create({
