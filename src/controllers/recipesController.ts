@@ -190,7 +190,7 @@ export const updateRecipe = async (
 		const { title, ingredients, steps, preparationTime } = req.body;
 		const userId = res.locals.user.id;
 
-		const existingRecipe = await Recipe.findById(id);
+		const existingRecipe = res.locals.recipe || (await Recipe.findById(id));
 		if (!existingRecipe) {
 			return res.status(404).json({ message: "Recipe not found" });
 		}
@@ -282,7 +282,7 @@ export const deleteRecipe = async (
 		const userId = res.locals.user.id;
 		const recipeId = id as string;
 
-		const recipe = await Recipe.findById(id);
+		const recipe = res.locals.recipe || (await Recipe.findById(id));
 		if (!recipe) {
 			return res.status(404).json({ message: "Recipe not found" });
 		}

@@ -14,7 +14,7 @@ export const updateComment = async (
 			return res.status(400).json({ message: "Content is required" });
 		}
 
-		const comment = await Comment.findById(id);
+		const comment = res.locals.comment || (await Comment.findById(id));
 
 		if (!comment) {
 			return res.status(404).json({ message: "Comment not found" });
