@@ -1,7 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import jwt, { type JwtPayload } from "jsonwebtoken";
+import User from "../models/User.ts";
 
-export const requireAuth = (
+export const requireAuth = async (
 	req: Request,
 	res: Response,
 	next: NextFunction,
@@ -11,10 +12,6 @@ export const requireAuth = (
 	const authHeader = req.headers.authorization;
 	if (authHeader && authHeader.startsWith("Bearer ")) {
 		token = authHeader.split(" ")[1];
-	}
-
-	if (!token && req.cookies?.token) {
-		token = req.cookies.token;
 	}
 
 	if (!token && req.headers.cookies) {
@@ -30,7 +27,13 @@ export const requireAuth = (
 
 	try {
 		const decoded = jwt.verify(token, process.env.ACCESS_TOKEN as string);
-		res.locals.user = decoded;
+		const existingUser = await User.findOne({
+			_id: (decoded as JwtPayload).id,
+		});
+		if (!existingUser) {
+			return res.status(401).json({ message: "Unauthorized - User not found" });
+		}
+		res.locals.user = existingUser;
 		next();
 	} catch (error) {
 		console.error("Token verification failed:", error);
