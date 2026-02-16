@@ -1,80 +1,166 @@
-import type { Request, Response, NextFunction } from "express";
+import type { Request, Response } from "express";
+import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import { createSecretToken } from "../lib/secretToken.js";
-import bcrypt from "bcrypt";
+import { formatId } from "../lib/formatter.js";
 
-export const signup = async (
-	req: Request,
+interface AuthRequest extends Request {
+	body: {
+		name?: string;
+		email: string;
+		password: string;
+	};
+}
+
+const handleResponse = (
 	res: Response,
-	next: NextFunction,
+	status: number,
+	message: string,
+	data: { [key: string]: unknown } = {},
 ) => {
+	res.status(status).json({
+		message,
+		...data,
+	});
+};
+
+const generateToken = (userId: string): string => {
+	return jwt.sign({ id: userId }, process.env.JWT_SECRET || "fallback_secret", {
+		expiresIn: "7d",
+	});
+};
+
+export const signup = async (req: AuthRequest, res: Response) => {
+	const { name, email, password } = req.body;
+
+	// Validate required fields
+	if (!name || !email || !password) {
+		return handleResponse(res, 400, "Name, email and password are required");
+	}
+
 	try {
-		const { name, email, password } = req.body;
-		if (!name || !email || !password) {
-			return res.status(400).json({ message: "All fields are required" });
+		// Check if user already exists
+		const existingUser = await User.findByEmail(email);
+		if (existingUser) {
+			return handleResponse(res, 409, "User with this email already exists");
 		}
-		const ifUserExists = await User.findOne({ email });
-		if (ifUserExists) {
-			return res
-				.status(400)
-				.json({ message: "You are already signed up. Please login" });
-		}
+
+		// Create new user
 		const user = await User.create({ name, email, password });
 
-		const token = createSecretToken(user._id);
+		// Generate JWT token
+		const token = generateToken(user.id);
+
+		// Set cookie with token
 		res.cookie("token", token, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === "production",
 			sameSite: "strict",
+			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 		});
 
-		res.status(201).json({ message: "Signup successful", user, token });
+		// Format user to convert id to _id
+		const formattedUser = formatId(user.toJSON());
+
+		handleResponse(res, 201, "User created successfully", {
+			user: formattedUser,
+			token,
+		});
 	} catch (error) {
+		if (
+			error instanceof Error &&
+			error.message.includes("Password must be at least 8 characters")
+		) {
+			return handleResponse(res, 400, error.message);
+		}
 		console.error("Signup error:", error);
-		next(error);
+		handleResponse(res, 500, "Error creating user");
 	}
 };
 
-export const login = async (
-	req: Request,
-	res: Response,
-	next: NextFunction,
-) => {
+export const login = async (req: AuthRequest, res: Response) => {
+	const { email, password } = req.body;
+
+	// Validate required fields
+	if (!email || !password) {
+		return handleResponse(res, 400, "Email and password are required");
+	}
+
 	try {
-		const { email, password } = req.body;
-		if (!email || !password) {
-			return res.status(400).json({ message: "Email and password required" });
-		}
-		const user = await User.findOne({ email });
+		// Find user by email
+		const user = await User.findByEmail(email);
 		if (!user) {
-			return res
-				.status(404)
-				.json({ message: "You are not registered. Please signup" });
+			return handleResponse(res, 401, "Invalid credentials");
 		}
 
-		const auth = await bcrypt.compare(password, user.password);
-		if (!auth) {
-			return res.status(401).json({ message: "Invalid credentials" });
+		// Compare password
+		const isPasswordValid = await user.comparePassword(password);
+		if (!isPasswordValid) {
+			return handleResponse(res, 401, "Invalid credentials");
 		}
-		const token = createSecretToken(user._id);
+
+		// Generate JWT token
+		const token = generateToken(user.id);
+
+		// Set cookie with token
 		res.cookie("token", token, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === "production",
 			sameSite: "strict",
+			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 		});
-		res.status(200).json({ message: "Login successful", user, token });
+
+		// Format user to convert id to _id
+		const formattedUser = formatId(user.toJSON());
+
+		handleResponse(res, 200, "Login successful", {
+			user: formattedUser,
+			token,
+		});
 	} catch (error) {
 		console.error("Login error:", error);
-		next(error);
+		handleResponse(res, 500, "Error during login");
 	}
 };
 
-export const logout = (req: Request, res: Response, _next: NextFunction) => {
-	res.clearCookie("token", {
-		httpOnly: true,
-		sameSite: "strict",
-		secure: process.env.NODE_ENV === "production",
-	});
+export const logout = async (req: Request, res: Response) => {
+	try {
+		// Clear the token cookie
+		res.clearCookie("token", {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			sameSite: "strict",
+		});
 
-	return res.status(200).json({ message: "Logout successful" });
+		handleResponse(res, 200, "Logout successful");
+	} catch (error) {
+		console.error("Logout error:", error);
+		handleResponse(res, 500, "Error during logout");
+	}
+};
+
+// Optional: Get current user profile
+export const getCurrentUser = async (
+	req: Request & { user?: { id: string } },
+	res: Response,
+) => {
+	try {
+		if (!req.user?.id) {
+			return handleResponse(res, 401, "Not authenticated");
+		}
+
+		const user = await User.findById(req.user.id);
+		if (!user) {
+			return handleResponse(res, 404, "User not found");
+		}
+
+		// Format user to convert id to _id
+		const formattedUser = formatId(user.toJSON());
+
+		handleResponse(res, 200, "User profile fetched successfully", {
+			user: formattedUser,
+		});
+	} catch (error) {
+		console.error("Get current user error:", error);
+		handleResponse(res, 500, "Error fetching user profile");
+	}
 };

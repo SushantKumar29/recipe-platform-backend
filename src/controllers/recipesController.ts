@@ -1,18 +1,17 @@
 import type { Request, Response, NextFunction } from "express";
-import Recipe from "../models/Recipe.js";
+import Recipe, { type RecipeWithStats } from "../models/Recipe.js";
 import Rating from "../models/Rating.js";
 import Comment from "../models/Comment.js";
-import {
-	buildFilteredQuery,
-	getPaginatedRecipes,
-} from "../utils/recipes/recipeUtils.ts";
-import cloudinary from "../config/cloudinary.ts";
-import { normalizeTextList } from "../lib/formatter.ts";
-import type { IRating, IRecipe } from "../utils/recipes/types.ts";
+import cloudinary from "../config/cloudinary.js";
+import { normalizeTextList, formatId } from "../lib/formatter.js";
 import type { UploadApiResponse } from "cloudinary";
 
+interface AuthRequest extends Request {
+	user?: { id: string };
+}
+
 export const fetchRecipes = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 	next: NextFunction,
 ) => {
@@ -24,30 +23,49 @@ export const fetchRecipes = async (
 			minRating,
 			page = "1",
 			limit = "10",
-			sortBy = "createdAt",
+			sortBy = "created_at",
 			sortOrder = "desc",
 		} = req.query;
 
 		const pageNum = parseInt(page as string) || 1;
 		const limitNum = parseInt(limit as string) || 10;
 
-		const query = await buildFilteredQuery({
+		// Parse preparation time filter
+		let maxPrepTime: number = 0;
+		if (preparationTime) {
+			switch (preparationTime) {
+				case "0-30":
+					maxPrepTime = 30;
+					break;
+				case "30-60":
+					maxPrepTime = 60;
+					break;
+				case "60-120":
+					maxPrepTime = 120;
+					break;
+				case "120+":
+					maxPrepTime = 1440;
+					break;
+			}
+		}
+
+		const { recipes, total } = await Recipe.findAll({
+			page: pageNum,
+			limit: limitNum,
+			sortBy: sortBy as string,
+			sortOrder: sortOrder as "asc" | "desc",
+			authorId: parseInt(authorId as string),
+			isPublished: true,
+			minRating: parseFloat(minRating as string),
+			maxPrepTime,
 			search: search as string,
-			authorId: authorId as string,
-			preparationTime: preparationTime as string,
-			minRating: minRating as string,
 		});
 
-		const { recipes, total } = await getPaginatedRecipes(
-			query,
-			pageNum,
-			limitNum,
-			sortBy as string,
-			sortOrder as string,
-		);
+		// Format recipes to convert id to _id
+		const formattedRecipes = formatId(recipes);
 
 		res.status(200).json({
-			data: recipes,
+			data: formattedRecipes,
 			pagination: {
 				page: pageNum,
 				limit: limitNum,
@@ -61,56 +79,59 @@ export const fetchRecipes = async (
 };
 
 export const fetchRecipe = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 	next: NextFunction,
 ) => {
 	try {
 		const { id } = req.params;
+		const recipeId = id as string;
 
-		const recipe = await Recipe.findById(id)
-			.populate("author", "name email")
-			.populate({
-				path: "ratings",
-				options: { sort: { createdAt: -1 } },
-				populate: { path: "author", select: "name email" },
-			});
-
+		const recipe = await Recipe.findById(recipeId);
 		if (!recipe) {
 			return res.status(404).json({ message: "Recipe not found" });
 		}
 
-		const recipeObj = recipe.toObject() as IRecipe;
-		const ratings = (recipeObj.ratings || []) as IRating[];
-		const ratingCount = ratings.length;
+		// Get rating stats
+		const ratingStats = await Rating.getAverageForRecipe(recipeId);
 
-		const averageRating =
-			ratingCount > 0
-				? parseFloat(
-						(
-							ratings.reduce((sum, r) => sum + r.value, 0) / ratingCount
-						).toFixed(1),
-					)
-				: 0;
+		// Get comments
+		const { comments } = await Comment.findByRecipe(recipeId, { limit: 5 });
 
-		res.status(200).json({
-			...recipeObj,
-			ratingCount,
-			averageRating,
-		});
+		// Format comments to convert id to _id
+		const formattedComments = formatId(comments);
+
+		// Format the recipe data
+		const recipeData = {
+			...recipe.toJSON(),
+			authorName: (recipe as any).authorName,
+			authorEmail: (recipe as any).authorEmail,
+			ratingCount: ratingStats.count,
+			averageRating: ratingStats.average,
+			recentComments: formattedComments,
+		};
+
+		// Format the entire recipe object
+		const formattedRecipe = formatId(recipeData);
+
+		res.status(200).json(formattedRecipe);
 	} catch (error) {
 		next(error);
 	}
 };
 
 export const createRecipe = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 	next: NextFunction,
 ) => {
 	try {
 		const { title, ingredients, steps, preparationTime } = req.body;
-		const userId = res.locals.user.id;
+		const userId = req.user?.id;
+
+		if (!userId) {
+			return res.status(401).json({ message: "Unauthorized" });
+		}
 
 		if (!title || !ingredients || !steps || !preparationTime) {
 			return res.status(400).json({ message: "All fields are required" });
@@ -145,7 +166,7 @@ export const createRecipe = async (
 							},
 						);
 
-						uploadStream.end(req?.file?.buffer);
+						uploadStream.end(req.file?.buffer);
 					},
 				);
 
@@ -160,54 +181,60 @@ export const createRecipe = async (
 			}
 		}
 
-		const newRecipe = new Recipe({
+		const newRecipe = await Recipe.create({
 			title,
 			ingredients: normalizedIngredients,
 			steps: normalizedSteps,
 			preparationTime: Number(preparationTime),
 			image: imageData,
-			author: userId,
+			authorId: userId,
 		});
 
-		const savedRecipe = await newRecipe.save();
+		// Format the recipe to convert id to _id
+		const formattedRecipe = formatId(newRecipe.toJSON());
 
 		res.status(201).json({
 			message: "Recipe created successfully",
-			recipe: savedRecipe,
+			recipe: formattedRecipe,
 		});
 	} catch (error) {
+		if (error instanceof Error) {
+			if (error.message.includes("Title must be")) {
+				return res.status(400).json({ message: error.message });
+			}
+			if (error.message.includes("Preparation time")) {
+				return res.status(400).json({ message: error.message });
+			}
+		}
 		next(error);
 	}
 };
 
 export const updateRecipe = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 	next: NextFunction,
 ) => {
 	try {
 		const { id } = req.params;
-		const { title, ingredients, steps, preparationTime } = req.body;
-		const userId = res.locals.user.id;
+		const { title, ingredients, steps, preparationTime, isPublished } =
+			req.body;
+		const userId = req.user?.id;
 
-		const existingRecipe = res.locals.recipe || (await Recipe.findById(id));
-		if (!existingRecipe) {
-			return res.status(404).json({ message: "Recipe not found" });
+		if (!userId) {
+			return res.status(401).json({ message: "Unauthorized" });
 		}
 
-		if (existingRecipe.author.toString() !== userId) {
-			return res.status(403).json({
-				message: "You are not authorized to update this recipe",
-			});
-		}
-
-		let imageData: { url: string; publicId: string } | null =
-			existingRecipe.image ?? null;
+		const recipeId = id as string;
+		let imageData: { url: string; publicId: string } | undefined;
 
 		if (req.file) {
-			if (imageData?.publicId) {
+			// Get existing recipe to delete old image
+			const existingRecipe = await Recipe.findById(recipeId);
+
+			if (existingRecipe?.image?.publicId) {
 				try {
-					await cloudinary.uploader.destroy(imageData.publicId);
+					await cloudinary.uploader.destroy(existingRecipe.image.publicId);
 				} catch (err) {
 					console.error("Error deleting old image:", err);
 				}
@@ -233,7 +260,7 @@ export const updateRecipe = async (
 							},
 						);
 
-						uploadStream.end(req?.file?.buffer);
+						uploadStream.end(req.file?.buffer);
 					},
 				);
 
@@ -248,52 +275,78 @@ export const updateRecipe = async (
 			}
 		}
 
-		const updateData = {
-			title: title || existingRecipe.title,
-			ingredients: normalizeTextList(ingredients ?? existingRecipe.ingredients),
-			steps: normalizeTextList(steps ?? existingRecipe.steps),
-			preparationTime: preparationTime
-				? parseInt(preparationTime)
-				: existingRecipe.preparationTime,
-			image: imageData,
-		};
+		const updates: any = {};
+		if (title) updates.title = title;
+		if (ingredients) updates.ingredients = normalizeTextList(ingredients);
+		if (steps) updates.steps = normalizeTextList(steps);
+		if (preparationTime) updates.preparationTime = Number(preparationTime);
+		if (imageData) updates.image = imageData;
+		if (isPublished !== undefined) updates.isPublished = isPublished;
 
-		const updatedRecipe = await Recipe.findByIdAndUpdate(id, updateData, {
-			new: true,
-			runValidators: true,
-		}).populate("author", "name email");
+		try {
+			const updatedRecipe = await Recipe.update(recipeId, userId, updates);
 
-		res.status(200).json({
-			message: "Recipe updated successfully",
-			recipe: updatedRecipe,
-		});
+			if (!updatedRecipe) {
+				return res.status(404).json({ message: "Recipe not found" });
+			}
+
+			// Format the recipe to convert id to _id
+			const formattedRecipe = formatId(updatedRecipe.toJSON());
+
+			res.status(200).json({
+				message: "Recipe updated successfully",
+				recipe: formattedRecipe,
+			});
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				error.message === "Unauthorized to update this recipe"
+			) {
+				return res.status(403).json({ message: error.message });
+			}
+			throw error;
+		}
 	} catch (error) {
+		if (error instanceof Error) {
+			if (
+				error.message.includes("Title must be") ||
+				error.message.includes("Preparation time")
+			) {
+				return res.status(400).json({ message: error.message });
+			}
+		}
 		next(error);
 	}
 };
 
 export const deleteRecipe = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 	next: NextFunction,
 ) => {
 	try {
 		const { id } = req.params;
-		const userId = res.locals.user.id;
+		const userId = req.user?.id;
+
+		if (!userId) {
+			return res.status(401).json({ message: "Unauthorized" });
+		}
+
 		const recipeId = id as string;
 
-		const recipe = res.locals.recipe || (await Recipe.findById(id));
+		// Get recipe to delete image from cloudinary
+		const recipe = await Recipe.findById(recipeId);
 		if (!recipe) {
 			return res.status(404).json({ message: "Recipe not found" });
 		}
 
-		if (recipe.author.toString() !== userId) {
-			return res.status(403).json({
-				message: "You are not authorized to delete this recipe",
-			});
+		if (recipe.authorId !== userId) {
+			return res
+				.status(403)
+				.json({ message: "Unauthorized to delete this recipe" });
 		}
 
-		if (recipe?.image?.publicId) {
+		if (recipe.image?.publicId) {
 			try {
 				await cloudinary.uploader.destroy(recipe.image.publicId);
 			} catch (deleteError) {
@@ -301,38 +354,50 @@ export const deleteRecipe = async (
 			}
 		}
 
-		const [deletedRecipe] = await Promise.all([
-			Recipe.findByIdAndDelete(id),
-			Comment.deleteMany({ recipe: recipeId }),
-			Rating.deleteMany({ recipe: recipeId }),
-		]);
+		try {
+			const deleted = await Recipe.delete(recipeId, userId);
 
-		if (!deletedRecipe) {
-			return res.status(404).json({ message: "Recipe not found" });
+			if (!deleted) {
+				return res.status(404).json({ message: "Recipe not found" });
+			}
+
+			res.status(200).json({
+				message: "Recipe deleted successfully",
+			});
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				error.message === "Unauthorized to delete this recipe"
+			) {
+				return res.status(403).json({ message: error.message });
+			}
+			throw error;
 		}
-
-		res.status(200).json({
-			message: "Recipe deleted successfully",
-		});
 	} catch (error) {
 		next(error);
 	}
 };
 
 export const rateRecipe = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 	next: NextFunction,
 ) => {
 	try {
 		const { id } = req.params;
 		const { value } = req.body;
+		const userId = req.user?.id;
 
-		const authorId = res.locals.user.id;
+		if (!userId) {
+			return res.status(401).json({ message: "Unauthorized" });
+		}
+
 		const recipeId = id as string;
 
-		if (!value) {
-			return res.status(400).json({ message: "Value is required" });
+		if (!value || value < 1 || value > 5) {
+			return res
+				.status(400)
+				.json({ message: "Rating value must be between 1 and 5" });
 		}
 
 		const recipe = await Recipe.findById(recipeId);
@@ -340,77 +405,76 @@ export const rateRecipe = async (
 			return res.status(404).json({ message: "Recipe not found" });
 		}
 
-		const existingRating = await Rating.findOne({
-			recipe: recipeId,
-			author: authorId,
-		});
+		try {
+			const rating = await Rating.create({
+				value,
+				authorId: userId,
+				recipeId,
+			});
 
-		if (existingRating) {
-			return res
-				.status(400)
-				.json({ message: "You have already rated this recipe" });
+			// Format the rating to convert id to _id
+			const formattedRating = formatId({
+				id: rating.id,
+				value: rating.value,
+				authorId: rating.authorId,
+				recipeId: rating.recipeId,
+				createdAt: rating.createdAt,
+			});
+
+			res.status(201).json({
+				message: "Recipe rated successfully",
+				rating: formattedRating,
+			});
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				error.message === "User has already rated this recipe"
+			) {
+				return res.status(400).json({ message: error.message });
+			}
+			throw error;
 		}
-
-		const rating = new Rating({
-			value,
-			author: authorId,
-			recipe: recipeId,
-		});
-
-		await rating.save();
-
-		res.status(201).json({
-			message: "Recipe rated successfully",
-			rating,
-		});
 	} catch (error) {
 		next(error);
 	}
 };
 
 export const fetchRecipeComments = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 	next: NextFunction,
 ) => {
 	try {
 		const { id } = req.params;
-		const recipeId = id as string;
 		const {
 			page = "1",
 			limit = "10",
-			sortBy = "createdAt",
+			sortBy = "created_at",
 			sortOrder = "desc",
 		} = req.query;
 
+		const recipeId = id as string;
 		const pageNum = Math.max(1, parseInt(page as string));
 		const limitNum = Math.max(1, parseInt(limit as string));
-		const offset = (pageNum - 1) * limitNum;
 
-		const sortField = ["createdAt", "updatedAt", "rating"].includes(
-			sortBy as string,
-		)
-			? (sortBy as string)
-			: "createdAt";
-		const sortDir = sortOrder === "asc" ? 1 : -1;
+		const { comments, total } = await Comment.findByRecipe(recipeId, {
+			page: pageNum,
+			limit: limitNum,
+			sortBy: sortBy as string,
+			sortOrder: sortOrder as "asc" | "desc",
+		});
 
-		const [comments, totalComments] = await Promise.all([
-			Comment.find({ recipe: recipeId })
-				.sort({ [sortField]: sortDir })
-				.skip(offset)
-				.limit(limitNum)
-				.populate("author", "name email"),
-			Comment.countDocuments({ recipe: recipeId }),
-		]);
+		// Format comments to convert id to _id
+		const formattedComments = formatId(comments);
 
-		const totalPages = Math.ceil(totalComments / limitNum);
+		const totalPages = Math.ceil(total / limitNum);
 
 		res.status(200).json({
-			comments,
+			comments: formattedComments,
 			pagination: {
 				page: pageNum,
 				totalPages,
-				totalComments,
+				totalComments: total,
 				hasNext: pageNum < totalPages,
 				hasPrev: pageNum > 1,
 				limit: limitNum,
@@ -422,50 +486,56 @@ export const fetchRecipeComments = async (
 };
 
 export const addCommentToRecipe = async (
-	req: Request,
+	req: AuthRequest,
 	res: Response,
 	next: NextFunction,
 ) => {
 	try {
 		const { id } = req.params;
 		const { content } = req.body;
-		const userId = res.locals.user.id;
+		const userId = req.user?.id;
+
+		if (!userId) {
+			return res.status(401).json({ message: "Unauthorized" });
+		}
+
 		const recipeId = id as string;
 
-		if (!content) {
+		if (!content || content.trim().length === 0) {
 			return res.status(400).json({ message: "Content is required" });
 		}
 
-		const recipe = await Recipe.findById(id);
+		const recipe = await Recipe.findById(recipeId);
 		if (!recipe) {
 			return res.status(404).json({ message: "Recipe not found" });
 		}
 
-		const existingComment = await Comment.findOne({
-			recipe: recipeId,
-			author: userId,
+		// Check if user already commented (optional - you can remove this if you want multiple comments)
+		const existingComments = await Comment.findByRecipe(recipeId, {
+			limit: 100,
 		});
+		const hasCommented = existingComments.comments.some(
+			(c) => c.author_id === userId,
+		);
 
-		if (existingComment) {
+		if (hasCommented) {
 			return res
 				.status(400)
 				.json({ message: "You have already commented on this recipe" });
 		}
 
 		const comment = await Comment.create({
-			recipe: id as string,
 			content,
-			author: userId,
+			authorId: userId,
+			recipeId,
 		});
 
-		const populatedComment = await Comment.findById(comment._id).populate(
-			"author",
-			"name email",
-		);
+		// Format the comment to convert id to _id
+		const formattedComment = formatId(comment);
 
 		res.status(201).json({
 			message: "Comment added successfully",
-			comment: populatedComment,
+			comment: formattedComment,
 		});
 	} catch (error) {
 		next(error);

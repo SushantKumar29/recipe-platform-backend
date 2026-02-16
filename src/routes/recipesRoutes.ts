@@ -11,7 +11,6 @@ import {
 } from "../controllers/recipesController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { checkOwnership } from "../middleware/ownership.ts";
-import Recipe from "../models/Recipe.ts";
 import { uploadSingleImage } from "../middleware/upload.ts";
 
 const router = express.Router();
@@ -252,7 +251,7 @@ router.post("/", requireAuth, uploadSingleImage, createRecipe);
 router.put(
 	"/:id",
 	requireAuth,
-	checkOwnership(Recipe),
+	// checkOwnership(Recipe),
 	uploadSingleImage,
 	updateRecipe,
 );
@@ -280,7 +279,12 @@ router.put(
  *       404:
  *         description: Recipe not found
  */
-router.delete("/:id", requireAuth, checkOwnership(Recipe), deleteRecipe);
+router.delete(
+	"/:id",
+	requireAuth,
+	// checkOwnership(Recipe),
+	deleteRecipe,
+);
 
 /**
  * @swagger

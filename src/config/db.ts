@@ -1,12 +1,17 @@
-import mongoose from "mongoose";
+import pkg from "pg";
 
-export const connectDB = async () => {
-	try {
-		const conn = await mongoose.connect(process.env.MONGO_URI as string);
+const { Pool } = pkg;
 
-		console.log(`MongoDB Connected: ${conn.connection.host}`);
-	} catch (error) {
-		console.error(error);
-		process.exit(1);
-	}
-};
+export const pool = new Pool({
+	connectionString: process.env.PG_DATABASE_URL,
+});
+
+pool.on("connect", () => {
+	console.log("Connected to PG database");
+});
+
+pool.on("remove", () => {
+	console.log("Disconnected from PG database");
+});
+
+export default pool;

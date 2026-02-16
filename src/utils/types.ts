@@ -1,13 +1,11 @@
-import type { Types } from "mongoose";
-
 export interface IUser {
-	_id: Types.ObjectId | string;
+	id: string;
 	name: string;
 	email: string;
 }
 
 export interface IRating {
-	_id: string;
+	id: string;
 	value: number;
 	author: IUser;
 	recipe: string;
@@ -16,19 +14,18 @@ export interface IRating {
 }
 
 export interface IRecipe {
-	_id: Types.ObjectId | string;
+	id: string;
 	title: string;
 	ingredients: string[];
 	steps: string[];
 	preparationTime: number;
-	author: string | Types.ObjectId | IUser;
+	author: string | IUser;
 	isPublished: boolean;
 	createdAt: NativeDate | string;
 	updatedAt: NativeDate | string;
 	ratingCount?: number;
 	averageRating?: number;
 	image?: string | { url: string; publicId: string } | null;
-	__v?: number;
 	ratings?: IRating[];
 }
 
@@ -41,7 +38,7 @@ export interface IFilteredQueryParams {
 
 export interface IRecipeQuery {
 	isPublished: boolean;
-	author?: Types.ObjectId;
+	author?: string | IUser;
 	$or?: Array<Record<string, unknown>>;
 	preparationTime?: { $gte?: number; $lte?: number };
 	minRating?: number;
