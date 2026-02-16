@@ -26,13 +26,18 @@ export const requireAuth = async (
 	}
 
 	try {
-		const decoded = jwt.verify(token, process.env.ACCESS_TOKEN as string);
-		const existingUser = await User.findOne({
-			_id: (decoded as JwtPayload).id,
-		});
+		const decoded = jwt.verify(
+			token,
+			process.env.ACCESS_TOKEN as string,
+		) as JwtPayload;
+
+		// const existingUser = await User.findById(decoded.id).select("-password");
+		const existingUser = decoded;
+
 		if (!existingUser) {
 			return res.status(401).json({ message: "Unauthorized - User not found" });
 		}
+
 		res.locals.user = existingUser;
 		next();
 	} catch (error) {
