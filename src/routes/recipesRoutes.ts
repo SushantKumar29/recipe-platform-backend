@@ -1,13 +1,13 @@
 import express from "express";
 import {
 	fetchRecipes,
-	// fetchRecipe,
+	fetchRecipe,
 	createRecipe,
-	// updateRecipe,
-	// deleteRecipe,
-	// rateRecipe,
-	// addCommentToRecipe,
-	// fetchRecipeComments,
+	updateRecipe,
+	deleteRecipe,
+	rateRecipe,
+	addCommentToRecipe,
+	fetchRecipeComments,
 } from "../controllers/recipesController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { checkOwnership } from "../middleware/ownership.ts";
@@ -130,7 +130,7 @@ router.get("/", fetchRecipes);
  *       404:
  *         description: Recipe not found
  */
-// router.get("/:id", fetchRecipe);
+router.get("/:id", fetchRecipe);
 
 /**
  * @swagger
@@ -166,7 +166,7 @@ router.get("/", fetchRecipes);
  *       404:
  *         description: Recipe not found
  */
-// router.get("/:id/comments", fetchRecipeComments);
+router.get("/:id/comments", fetchRecipeComments);
 
 /**
  * @swagger
@@ -249,13 +249,13 @@ router.post("/", requireAuth, uploadSingleImage, createRecipe);
  *         description: Recipe updated successfully
  */
 
-// router.put(
-// 	"/:id",
-// 	requireAuth,
-// 	// checkOwnership(Recipe),
-// 	uploadSingleImage,
-// 	updateRecipe,
-// );
+router.put(
+	"/:id",
+	requireAuth,
+	checkOwnership("recipe", "authorId"),
+	uploadSingleImage,
+	updateRecipe,
+);
 
 /**
  * @swagger
@@ -281,12 +281,12 @@ router.post("/", requireAuth, uploadSingleImage, createRecipe);
  *         description: Recipe not found
  */
 
-// router.delete(
-// 	"/:id",
-// 	requireAuth,
-// 	// checkOwnership(Recipe),
-// 	deleteRecipe,
-// );
+router.delete(
+	"/:id",
+	requireAuth,
+	checkOwnership("recipe", "authorId"),
+	deleteRecipe,
+);
 
 /**
  * @swagger
@@ -327,7 +327,7 @@ router.post("/", requireAuth, uploadSingleImage, createRecipe);
  *         description: Recipe not found
  */
 
-// router.post("/:id/rate", requireAuth, rateRecipe);
+router.post("/:id/rate", requireAuth, rateRecipe);
 
 /**
  * @swagger
@@ -365,6 +365,6 @@ router.post("/", requireAuth, uploadSingleImage, createRecipe);
  *         description: Recipe not found
  */
 
-// router.post("/:id/comments", requireAuth, addCommentToRecipe);
+router.post("/:id/comments", requireAuth, addCommentToRecipe);
 
 export default router;

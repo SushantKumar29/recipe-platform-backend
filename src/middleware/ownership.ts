@@ -1,9 +1,13 @@
 import type { Request, Response, NextFunction } from "express";
-import mongoose from "mongoose";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+type PrismaModel = keyof typeof prisma;
 
 export const checkOwnership = (
-	model: mongoose.Model<any>,
-	fieldName = "author",
+	modelName: PrismaModel,
+	fieldName = "authorId",
 ) => {
 	return async (req: Request, res: Response, next: NextFunction) => {
 		try {
@@ -14,26 +18,37 @@ export const checkOwnership = (
 				return res.status(401).json({ message: "Unauthorized" });
 			}
 
-			const document = await model.findById(id);
+			// Get the model from Prisma
+			const model = (prisma as any)[modelName as string];
 
-			if (!document) {
+			if (!model) {
 				return res
-					.status(404)
-					.json({ message: `${model.modelName} not found` });
+					.status(500)
+					.json({ message: `Model ${String(modelName)} not found` });
 			}
 
-			const ownerId = document[fieldName];
-			const ownerIdString = ownerId.toString
-				? ownerId.toString()
-				: String(ownerId);
+			// Find the document
+			const document = await model.findUnique({
+				where: { id },
+			});
 
-			if (ownerIdString !== userId) {
-				return res.status(403).json({
-					message: `Not allowed to modify this ${model.modelName.toLowerCase()}`,
+			if (!document) {
+				return res.status(404).json({
+					message: `${String(modelName)} not found`,
 				});
 			}
 
-			res.locals[model.modelName.toLowerCase()] = document;
+			// Check ownership
+			const ownerId = document[fieldName];
+
+			if (!ownerId || ownerId !== userId) {
+				return res.status(403).json({
+					message: `Not allowed to modify this ${String(modelName).toLowerCase()}`,
+				});
+			}
+
+			// Store in res.locals for later use
+			res.locals[String(modelName).toLowerCase()] = document;
 			next();
 		} catch (error) {
 			next(error);

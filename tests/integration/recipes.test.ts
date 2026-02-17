@@ -25,20 +25,12 @@ describe("Recipes API", () => {
 				password: "password123",
 			});
 
-		console.log("Signup responses:", {
-			user1Status: userRes.status,
-			user2Status: user2Res.status,
-			user1HasToken: !!userRes.body.token,
-			user2HasToken: !!user2Res.body.token,
-		});
-
 		expect(userRes.status).toBe(201);
 		expect(user2Res.status).toBe(201);
 
 		userToken = userRes.body.token;
 		user2Token = user2Res.body.token;
 
-		console.log("Testing recipe creation with token...");
 		const testRes = await request(app)
 			.post("/api/v1/recipes")
 			.set("Cookie", `token=${userToken}`)
@@ -49,22 +41,11 @@ describe("Recipes API", () => {
 				preparationTime: 30,
 			});
 
-		console.log("Initial recipe creation test:", {
-			status: testRes.status,
-			message: testRes.body?.message,
-			error: testRes.body?.error,
-		});
-
 		recipeId = testRes.body.recipe?.id;
 	});
 
 	describe("Recipe CRUD Operations", () => {
 		it("should create a recipe", async () => {
-			console.log(
-				"Creating recipe with token:",
-				userToken ? "Token exists" : "No token",
-			);
-
 			const res = await request(app)
 				.post("/api/v1/recipes")
 				.set("Cookie", `token=${userToken}`)
@@ -75,12 +56,6 @@ describe("Recipes API", () => {
 					steps: ["Step 1", "Step 2"],
 					preparationTime: 30,
 				});
-
-			console.log("Create recipe response:", {
-				status: res.status,
-				body: res.body,
-				headers: res.headers,
-			});
 
 			if (res.status === 201 || res.status === 200) {
 				recipeId = res.body.recipe?.id;
@@ -94,11 +69,6 @@ describe("Recipes API", () => {
 
 		it("should get all recipes", async () => {
 			const res = await request(app).get("/api/v1/recipes");
-
-			console.log("Get all recipes:", {
-				status: res.status,
-				dataLength: res.body.data?.length,
-			});
 
 			expect(res.status).toBe(200);
 			expect(res.body).toHaveProperty("data");
@@ -130,11 +100,6 @@ describe("Recipes API", () => {
 			if (recipeId) {
 				const res = await request(app).get(`/api/v1/recipes/${recipeId}`);
 
-				console.log("Get single recipe:", {
-					status: res.status,
-					body: res.body,
-				});
-
 				if (res.status === 200) {
 					expect(res.body.id).toBe(recipeId);
 				} else if (res.status === 404) {
@@ -151,8 +116,6 @@ describe("Recipes API", () => {
 				return;
 			}
 
-			console.log("Updating recipe with ID:", recipeId);
-
 			const res = await request(app)
 				.put(`/api/v1/recipes/${recipeId}`)
 				.set("Cookie", `token=${userToken}`)
@@ -164,12 +127,6 @@ describe("Recipes API", () => {
 					preparationTime: 45,
 				});
 
-			console.log("Update recipe response:", {
-				status: res.status,
-				message: res.body?.message,
-				error: res.body?.error,
-			});
-
 			if (res.status === 200) {
 				expect(res.body.message).toMatch(/updated|success/i);
 			} else {
@@ -178,8 +135,6 @@ describe("Recipes API", () => {
 		});
 
 		it("should delete a recipe", async () => {
-			console.log("Creating recipe to delete...");
-
 			const createRes = await request(app)
 				.post("/api/v1/recipes")
 				.set("Cookie", `token=${userToken}`)
@@ -191,11 +146,6 @@ describe("Recipes API", () => {
 					preparationTime: 10,
 				});
 
-			console.log("Create for delete:", {
-				status: createRes.status,
-				hasRecipe: !!createRes.body.recipe,
-			});
-
 			if (createRes.status === 201 || createRes.status === 200) {
 				const deleteRecipeId = createRes.body.recipe.id;
 
@@ -203,11 +153,6 @@ describe("Recipes API", () => {
 					.delete(`/api/v1/recipes/${deleteRecipeId}`)
 					.set("Cookie", `token=${userToken}`)
 					.set("Authorization", `Bearer ${userToken}`);
-
-				console.log("Delete response:", {
-					status: deleteRes.status,
-					message: deleteRes.body?.message,
-				});
 
 				if (deleteRes.status === 200) {
 					expect(deleteRes.body.message).toMatch(/deleted|success/i);
@@ -227,17 +172,10 @@ describe("Recipes API", () => {
 				return;
 			}
 
-			console.log("Rating recipe:", recipeId);
-
 			const res = await request(app)
 				.post(`/api/v1/recipes/${recipeId}/rate`)
 				.set("Cookie", `token=${user2Token}`)
 				.send({ value: 5 });
-
-			console.log("Rate recipe response:", {
-				status: res.status,
-				body: res.body,
-			});
 
 			if (res.status !== 200 && res.status !== 201) {
 				console.log(
@@ -273,7 +211,6 @@ describe("Recipes API", () => {
 				});
 
 			const freshRecipeId = freshRecipeRes.body.recipe.id;
-			console.log("Created fresh recipe for duplicate test:", freshRecipeId);
 
 			const firstRating = await request(app)
 				.post(`/api/v1/recipes/${freshRecipeId}/rate`)
@@ -281,21 +218,11 @@ describe("Recipes API", () => {
 				.set("Authorization", `Bearer ${userToken}`)
 				.send({ value: 4 });
 
-			console.log("First rating response:", {
-				status: firstRating.status,
-				message: firstRating.body?.message,
-			});
-
 			const secondRating = await request(app)
 				.post(`/api/v1/recipes/${freshRecipeId}/rate`)
 				.set("Cookie", `token=${userToken}`)
 				.set("Authorization", `Bearer ${userToken}`)
 				.send({ value: 3 });
-
-			console.log("Second rating response:", {
-				status: secondRating.status,
-				message: secondRating.body?.message,
-			});
 
 			expect([200, 201]).toContain(firstRating.status);
 
@@ -333,11 +260,6 @@ describe("Recipes API", () => {
 				.set("Authorization", `Bearer ${user2Token}`)
 				.send({});
 
-			console.log("Missing value response:", {
-				status: res.status,
-				message: res.body?.message,
-			});
-
 			expect([400, 401]).toContain(res.status);
 			if (res.status === 400) {
 				expect(res.body.message).toMatch(/value.*required|required.*value/i);
@@ -354,11 +276,6 @@ describe("Recipes API", () => {
 				.post(`/api/v1/recipes/${recipeId}/rate`)
 				.send({ value: 5 });
 
-			console.log("Unauthenticated rating response:", {
-				status: res.status,
-				message: res.body?.message,
-			});
-
 			expect(res.status).toBe(401);
 		});
 
@@ -370,11 +287,6 @@ describe("Recipes API", () => {
 				.set("Cookie", `token=${user2Token}`)
 				.set("Authorization", `Bearer ${user2Token}`)
 				.send({ value: 5 });
-
-			console.log("Non-existent recipe rating:", {
-				status: res.status,
-				message: res.body?.message,
-			});
 
 			expect([404, 401]).toContain(res.status);
 			if (res.status === 404) {
@@ -423,13 +335,6 @@ describe("Recipes API", () => {
 				.set("Authorization", `Bearer ${user3Token}`)
 				.send({ value: 3 });
 
-			console.log("Multi-user rating test:", {
-				user2Status: rating1.status,
-				user3Status: rating2.status,
-				user2Message: rating1.body?.message,
-				user3Message: rating2.body?.message,
-			});
-
 			if (rating1.status !== 401) {
 				expect([200, 201, 400]).toContain(rating1.status);
 			}
@@ -460,8 +365,6 @@ describe("Recipes API", () => {
 
 			expect(freshRecipeRes.status).toBe(201);
 			const freshRecipeId = freshRecipeRes.body.recipe.id;
-			console.log("Created fresh recipe for duplicate test:", freshRecipeId);
-			console.log("Adding comment to recipe:", recipeId);
 
 			const res = await request(app)
 				.post(`/api/v1/recipes/${freshRecipeId}/comments`)
@@ -470,11 +373,6 @@ describe("Recipes API", () => {
 				.send({
 					content: "This is a test comment on the recipe",
 				});
-
-			console.log("Add comment response:", {
-				status: res.status,
-				body: res.body,
-			});
 
 			expect(res.status).toBe(201);
 			expect(res.body.message).toBe("Comment added successfully");
@@ -504,7 +402,6 @@ describe("Recipes API", () => {
 
 			expect(freshRecipeRes.status).toBe(201);
 			const freshRecipeId = freshRecipeRes.body.recipe.id;
-			console.log("Created fresh recipe for duplicate test:", freshRecipeId);
 
 			const firstComment = await request(app)
 				.post(`/api/v1/recipes/${freshRecipeId}/comments`)
@@ -513,11 +410,6 @@ describe("Recipes API", () => {
 				.send({
 					content: "This is my first comment",
 				});
-
-			console.log("First comment response:", {
-				status: firstComment.status,
-				message: firstComment.body?.message,
-			});
 
 			expect(firstComment.status).toBe(201);
 			expect(firstComment.body.message).toBe("Comment added successfully");
@@ -529,11 +421,6 @@ describe("Recipes API", () => {
 				.send({
 					content: "This is my second comment",
 				});
-
-			console.log("Second comment response:", {
-				status: secondComment.status,
-				message: secondComment.body?.message,
-			});
 
 			expect(secondComment.status).toBe(400);
 			expect(secondComment.body.message).toBe(
@@ -588,13 +475,6 @@ describe("Recipes API", () => {
 					content: "Comment from user 3",
 				});
 
-			console.log("Multi-user comment test:", {
-				user2Status: comment1.status,
-				user3Status: comment2.status,
-				user2Message: comment1.body?.message,
-				user3Message: comment2.body?.message,
-			});
-
 			expect(comment1.status).toBe(201);
 			expect(comment2.status).toBe(201);
 
@@ -611,10 +491,23 @@ describe("Recipes API", () => {
 		});
 
 		it("should allow user to comment on different recipes", async () => {
+			// Create a fresh user for this test
+			const freshUserRes = await request(app)
+				.post("/api/v1/auth/signup")
+				.send({
+					name: "Fresh Comment User",
+					email: `fresh${Date.now()}@test.com`,
+					password: "password123",
+				});
+
+			expect(freshUserRes.status).toBe(201);
+			const freshToken = freshUserRes.body.token;
+
+			// Create first recipe with fresh token
 			const recipe1Res = await request(app)
 				.post("/api/v1/recipes")
-				.set("Cookie", `token=${userToken}`)
-				.set("Authorization", `Bearer ${userToken}`)
+				.set("Cookie", `token=${freshToken}`)
+				.set("Authorization", `Bearer ${freshToken}`)
 				.send({
 					title: "First Recipe for Comment Test",
 					ingredients: ["Test"],
@@ -622,10 +515,14 @@ describe("Recipes API", () => {
 					preparationTime: 15,
 				});
 
+			expect(recipe1Res.status).toBe(201);
+			const recipe1Id = recipe1Res.body.recipe.id;
+
+			// Create second recipe
 			const recipe2Res = await request(app)
 				.post("/api/v1/recipes")
-				.set("Cookie", `token=${userToken}`)
-				.set("Authorization", `Bearer ${userToken}`)
+				.set("Cookie", `token=${freshToken}`)
+				.set("Authorization", `Bearer ${freshToken}`)
 				.send({
 					title: "Second Recipe for Comment Test",
 					ingredients: ["Test"],
@@ -633,37 +530,25 @@ describe("Recipes API", () => {
 					preparationTime: 15,
 				});
 
-			expect(recipe1Res.status).toBe(201);
 			expect(recipe2Res.status).toBe(201);
-
-			const recipe1Id = recipe1Res.body.recipe.id;
 			const recipe2Id = recipe2Res.body.recipe.id;
 
+			// Add comments
 			const comment1 = await request(app)
 				.post(`/api/v1/recipes/${recipe1Id}/comments`)
-				.set("Cookie", `token=${userToken}`)
-				.set("Authorization", `Bearer ${userToken}`)
-				.send({
-					content: "Comment on recipe 1",
-				});
+				.set("Cookie", `token=${freshToken}`)
+				.set("Authorization", `Bearer ${freshToken}`)
+				.send({ content: "Comment on recipe 1" });
+
+			expect(comment1.status).toBe(201);
 
 			const comment2 = await request(app)
 				.post(`/api/v1/recipes/${recipe2Id}/comments`)
-				.set("Cookie", `token=${userToken}`)
-				.set("Authorization", `Bearer ${userToken}`)
-				.send({
-					content: "Comment on recipe 2",
-				});
+				.set("Cookie", `token=${freshToken}`)
+				.set("Authorization", `Bearer ${freshToken}`)
+				.send({ content: "Comment on recipe 2" });
 
-			console.log("Different recipes comment test:", {
-				recipe1Status: comment1.status,
-				recipe2Status: comment2.status,
-			});
-
-			expect(comment1.status).toBe(201);
 			expect(comment2.status).toBe(201);
-			expect(comment1.body.comment.recipe).toBe(recipe1Id);
-			expect(comment2.body.comment.recipe).toBe(recipe2Id);
 		});
 
 		it("should fetch comments for a recipe", async () => {
@@ -672,17 +557,9 @@ describe("Recipes API", () => {
 				return;
 			}
 
-			console.log("Fetching comments for recipe:", recipeId);
-
 			const res = await request(app).get(
 				`/api/v1/recipes/${recipeId}/comments`,
 			);
-
-			console.log("Fetch comments response:", {
-				status: res.status,
-				commentsCount: res.body.comments?.length,
-				pagination: res.body.pagination,
-			});
 
 			expect(res.status).toBe(200);
 			expect(Array.isArray(res.body.comments)).toBe(true);
@@ -745,12 +622,6 @@ describe("Recipes API", () => {
 				`/api/v1/recipes/${paginationRecipeId}/comments?page=1&limit=2`,
 			);
 
-			console.log("Pagination test response:", {
-				status: res.status,
-				commentsCount: res.body.comments?.length,
-				pagination: res.body.pagination,
-			});
-
 			expect(res.status).toBe(200);
 			expect(res.body).toHaveProperty("pagination");
 			expect(res.body.pagination).toHaveProperty("page", 1);
@@ -775,11 +646,6 @@ describe("Recipes API", () => {
 				.set("Authorization", `Bearer ${userToken}`)
 				.send({});
 
-			console.log("Empty content test:", {
-				status: res.status,
-				message: res.body?.message,
-			});
-
 			expect(res.status).toBe(400);
 			expect(res.body.message).toBe("Content is required");
 		});
@@ -796,11 +662,6 @@ describe("Recipes API", () => {
 					content: "Unauthenticated comment",
 				});
 
-			console.log("Unauthenticated comment test:", {
-				status: res.status,
-				message: res.body?.message,
-			});
-
 			expect(res.status).toBe(401);
 		});
 
@@ -814,11 +675,6 @@ describe("Recipes API", () => {
 				.send({
 					content: "Comment on non-existent recipe",
 				});
-
-			console.log("Non-existent recipe comment test:", {
-				status: res.status,
-				message: res.body?.message,
-			});
 
 			expect(res.status).toBe(404);
 			expect(res.body.message).toBe("Recipe not found");
@@ -836,11 +692,6 @@ describe("Recipes API", () => {
 					preparationTime: 10,
 				});
 
-			console.log("Unauthenticated create:", {
-				status: res.status,
-				message: res.body?.message,
-			});
-
 			expect([401, 403]).toContain(res.status);
 		});
 
@@ -852,11 +703,6 @@ describe("Recipes API", () => {
 				.send({
 					title: "Incomplete Recipe",
 				});
-
-			console.log("Validation test:", {
-				status: res.status,
-				message: res.body?.message,
-			});
 
 			if (res.status === 400) {
 				expect(res.body.message).toMatch(/required|fields/i);

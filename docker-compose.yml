@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: recipe_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: recipe_platform_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: recipe_node_app
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      PG_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/recipe_platform_db
+    volumes:
+      - .:/usr/src/app
+    command: >
+      sh -c "
+      npx prisma generate &&
+      npx prisma migrate deploy &&
+      npm run dev
+      "
+
+volumes:
+  postgres_data:

@@ -1,4 +1,3 @@
-// src/middleware/auth.ts
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
@@ -22,7 +21,6 @@ export const requireAuth = async (
 	try {
 		let token: string | undefined;
 		const authHeader = req.headers.authorization;
-		console.log("🚀 ~ requireAuth ~ req.headers:", req.headers);
 		if (authHeader && authHeader.startsWith("Bearer ")) {
 			token = authHeader.split(" ")[1];
 		}

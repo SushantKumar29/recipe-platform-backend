@@ -31,30 +31,25 @@ const generateToken = (userId: string): string => {
 export const signup = async (req: AuthRequest, res: Response) => {
 	const { name, email, password } = req.body;
 
-	// Validate required fields
 	if (!name || !email || !password) {
 		return handleResponse(res, 400, "Name, email and password are required");
 	}
 
 	try {
-		// Check if user already exists
 		const existingUser = await User.getUserByEmail(email);
 		if (existingUser) {
-			return handleResponse(res, 409, "User with this email already exists");
+			return handleResponse(res, 400, "User with this email already exists");
 		}
 
-		// Create new user
 		const user = await User.createUser({ name, email, password });
 
-		// Generate JWT token
 		const token = generateToken(user.id);
 
-		// Set cookie with token
 		res.cookie("token", token, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === "production",
 			sameSite: "strict",
-			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+			maxAge: 7 * 24 * 60 * 60 * 1000,
 		});
 
 		handleResponse(res, 201, "User created successfully", {
@@ -76,33 +71,28 @@ export const signup = async (req: AuthRequest, res: Response) => {
 export const login = async (req: AuthRequest, res: Response) => {
 	const { email, password } = req.body;
 
-	// Validate required fields
 	if (!email || !password) {
 		return handleResponse(res, 400, "Email and password are required");
 	}
 
 	try {
-		// Find user by email
 		const user = await User.getUserByEmail(email);
 		if (!user) {
 			return handleResponse(res, 401, "Invalid credentials");
 		}
 
-		// Compare password
 		const isPasswordValid = await User.comparePassword(user, password);
 		if (!isPasswordValid) {
 			return handleResponse(res, 401, "Invalid credentials");
 		}
 
-		// Generate JWT token
 		const token = generateToken(user.id);
 
-		// Set cookie with token
 		res.cookie("token", token, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === "production",
 			sameSite: "strict",
-			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+			maxAge: 7 * 24 * 60 * 60 * 1000,
 		});
 
 		handleResponse(res, 200, "Login successful", {
@@ -117,7 +107,6 @@ export const login = async (req: AuthRequest, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
 	try {
-		// Clear the token cookie
 		res.clearCookie("token", {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === "production",
@@ -131,7 +120,6 @@ export const logout = async (req: Request, res: Response) => {
 	}
 };
 
-// Get current user profile
 export const getCurrentUser = async (
 	req: Request & { user?: { id: string } },
 	res: Response,

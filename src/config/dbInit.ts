@@ -20,11 +20,9 @@ class DatabaseInitializer {
 		}
 
 		try {
-			// Enable required extensions
-			await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`); // For gen_random_uuid()
+			await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 			await pool.query(`CREATE EXTENSION IF NOT EXISTS "pg_trgm";`);
 
-			// Create update function (shared across all tables)
 			await pool.query(`
         CREATE OR REPLACE FUNCTION update_updated_at_column()
         RETURNS TRIGGER AS $$
@@ -35,16 +33,12 @@ class DatabaseInitializer {
         $$ language 'plpgsql';
       `);
 
-			// Initialize Users table
 			await this.initializeUsersTable();
 
-			// Initialize Recipes table
 			await this.initializeRecipesTable();
 
-			// Initialize Ratings table
 			await this.initializeRatingsTable();
 
-			// Initialize Comments table
 			await this.initializeCommentsTable();
 
 			this.initialized = true;
@@ -68,7 +62,6 @@ class DatabaseInitializer {
       );
     `);
 
-		// Create trigger for users
 		await pool.query(`
       DROP TRIGGER IF EXISTS update_users_updated_at ON users;
       CREATE TRIGGER update_users_updated_at
@@ -97,7 +90,6 @@ class DatabaseInitializer {
       );
     `);
 
-		// Create indexes
 		await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_recipes_preparation_time ON recipes(preparation_time);
       CREATE INDEX IF NOT EXISTS idx_recipes_author_id ON recipes(author_id);
@@ -107,7 +99,6 @@ class DatabaseInitializer {
       CREATE INDEX IF NOT EXISTS idx_recipes_ingredients ON recipes USING gin (ingredients);
     `);
 
-		// Create trigger for recipes
 		await pool.query(`
       DROP TRIGGER IF EXISTS update_recipes_updated_at ON recipes;
       CREATE TRIGGER update_recipes_updated_at
@@ -186,5 +177,4 @@ class DatabaseInitializer {
 	}
 }
 
-// Export a singleton instance
 export const dbInitializer = DatabaseInitializer.getInstance();

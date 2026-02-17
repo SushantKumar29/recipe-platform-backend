@@ -2,8 +2,6 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Simple create function
-
 export async function getRecipes(options?: {
 	page?: number;
 	limit?: number;
@@ -42,7 +40,6 @@ export async function getRecipes(options?: {
 		prisma.recipe.count({ where }),
 	]);
 
-	// Add rating info to each recipe
 	const recipesWithRating = recipes.map((recipe: any) => {
 		const ratings = recipe.ratings as any[];
 		const ratingCount = ratings.length;
@@ -56,6 +53,10 @@ export async function getRecipes(options?: {
 
 		return {
 			...recipe,
+			image: {
+				url: recipe.imageUrl,
+				publicId: recipe.imagePublicId,
+			},
 			averageRating,
 			ratingCount,
 		};
@@ -78,7 +79,6 @@ export async function createRecipe(data: {
 	authorId: string;
 	isPublished?: boolean;
 }) {
-	// Simple validation
 	if (data.title.length < 3 || data.title.length > 100) {
 		throw new Error("Title must be between 3 and 100 characters");
 	}
@@ -99,116 +99,116 @@ export async function createRecipe(data: {
 		},
 		include: {
 			author: {
-				select: { name: true, email: true },
+				select: { id: true, name: true, email: true },
 			},
 		},
 	});
 
-	return recipe;
+	return {
+		...recipe,
+		image: {
+			url: data.image?.url ?? null,
+			publicId: data.image?.publicId ?? null,
+		},
+	};
 }
 
-// // Simple find by id
-// export async function getRecipeById(id: string) {
-// 	const recipe = await prisma.recipe.findUnique({
-// 		where: { id },
-// 		include: {
-// 			author: {
-// 				select: { name: true, email: true },
-// 			},
-// 			ratings: true,
-// 		},
-// 	});
+export async function getRecipeById(id: string) {
+	const recipe = await prisma.recipe.findUnique({
+		where: { id },
+		include: {
+			author: {
+				select: { id: true, name: true, email: true },
+			},
+			ratings: true,
+		},
+	});
 
-// 	if (!recipe) return null;
+	if (!recipe) return null;
 
-// 	// Calculate average rating
-// 	const ratings = recipe.ratings as any[];
-// 	const ratingCount = ratings.length;
-// 	const averageRating = ratingCount
-// 		? Number(
-// 				(ratings.reduce((sum, r) => sum + r.value, 0) / ratingCount).toFixed(1),
-// 			)
-// 		: 0;
+	const ratings = recipe.ratings as any[];
+	const ratingCount = ratings.length;
+	const averageRating = ratingCount
+		? Number(
+				(ratings.reduce((sum, r) => sum + r.value, 0) / ratingCount).toFixed(1),
+			)
+		: 0;
 
-// 	return {
-// 		...recipe,
-// 		averageRating,
-// 		ratingCount,
-// 	};
-// }
+	return {
+		...recipe,
+		image: {
+			url: recipe.imageUrl,
+			publicId: recipe.imagePublicId,
+		},
+		averageRating,
+		ratingCount,
+	};
+}
 
-// // Simple find all with filters
+export async function updateRecipe(
+	id: string,
+	userId: string,
+	data: Partial<{
+		title: string;
+		ingredients: string[];
+		steps: string[];
+		preparationTime: number;
+		image: { url: string; publicId: string };
+		isPublished: boolean;
+	}>,
+) {
+	const recipe = await prisma.recipe.findUnique({ where: { id } });
+	if (!recipe) throw new Error("Recipe not found");
+	if (recipe.authorId !== userId) throw new Error("Unauthorized");
 
-// // Simple update
-// export async function updateRecipe(
-// 	id: string,
-// 	userId: string,
-// 	data: Partial<{
-// 		title: string;
-// 		ingredients: string[];
-// 		steps: string[];
-// 		preparationTime: number;
-// 		image: { url: string; publicId: string };
-// 		isPublished: boolean;
-// 	}>,
-// ) {
-// 	// Check ownership
-// 	const recipe = await prisma.recipe.findUnique({ where: { id } });
-// 	if (!recipe) throw new Error("Recipe not found");
-// 	if (recipe.authorId !== userId) throw new Error("Unauthorized");
+	const updateData: any = {};
+	if (data.title) updateData.title = data.title;
+	if (data.ingredients) updateData.ingredients = data.ingredients;
+	if (data.steps) updateData.steps = data.steps;
+	if (data.preparationTime) updateData.preparationTime = data.preparationTime;
+	if (data.image) {
+		updateData.imageUrl = data.image.url;
+		updateData.imagePublicId = data.image.publicId;
+	}
+	if (data.isPublished !== undefined) updateData.isPublished = data.isPublished;
 
-// 	// Prepare update data
-// 	const updateData: any = {};
-// 	if (data.title) updateData.title = data.title;
-// 	if (data.ingredients) updateData.ingredients = data.ingredients;
-// 	if (data.steps) updateData.steps = data.steps;
-// 	if (data.preparationTime) updateData.preparationTime = data.preparationTime;
-// 	if (data.image) {
-// 		updateData.imageUrl = data.image.url;
-// 		updateData.imagePublicId = data.image.publicId;
-// 	}
-// 	if (data.isPublished !== undefined) updateData.isPublished = data.isPublished;
+	return await prisma.recipe.update({
+		where: { id },
+		data: updateData,
+		include: {
+			author: { select: { name: true, email: true } },
+		},
+	});
+}
 
-// 	return await prisma.recipe.update({
-// 		where: { id },
-// 		data: updateData,
-// 		include: {
-// 			author: { select: { name: true, email: true } },
-// 		},
-// 	});
-// }
+export async function deleteRecipe(id: string, userId: string) {
+	const recipe = await prisma.recipe.findUnique({ where: { id } });
+	if (!recipe) throw new Error("Recipe not found");
+	if (recipe.authorId !== userId) throw new Error("Unauthorized");
 
-// // Simple delete
-// export async function deleteRecipe(id: string, userId: string) {
-// 	const recipe = await prisma.recipe.findUnique({ where: { id } });
-// 	if (!recipe) throw new Error("Recipe not found");
-// 	if (recipe.authorId !== userId) throw new Error("Unauthorized");
+	await prisma.recipe.delete({ where: { id } });
+	return { success: true };
+}
 
-// 	await prisma.recipe.delete({ where: { id } });
-// 	return { success: true };
-// }
+export async function getUserRecipes(userId: string) {
+	return await prisma.recipe.findMany({
+		where: { authorId: userId },
+		include: {
+			ratings: { select: { value: true } },
+		},
+		orderBy: { createdAt: "desc" },
+	});
+}
 
-// // Simple get recipes by user
-// export async function getUserRecipes(userId: string) {
-// 	return await prisma.recipe.findMany({
-// 		where: { authorId: userId },
-// 		include: {
-// 			ratings: { select: { value: true } },
-// 		},
-// 		orderBy: { createdAt: "desc" },
-// 	});
-// }
+export async function getRecipeRating(recipeId: string) {
+	const ratings = await prisma.rating.aggregate({
+		where: { recipeId },
+		_avg: { value: true },
+		_count: { value: true },
+	});
 
-// // Simple get recipe rating
-// export async function getRecipeRating(recipeId: string) {
-// 	const ratings = await prisma.rating.aggregate({
-// 		where: { recipeId },
-// 		_avg: { value: true },
-// 		_count: { value: true },
-// 	});
-
-// 	return {
-// 		average: ratings._avg.value || 0,
-// 		count: ratings._count.value || 0,
-// 	};
-// }
+	return {
+		average: ratings._avg.value || 0,
+		count: ratings._count.value || 0,
+	};
+}

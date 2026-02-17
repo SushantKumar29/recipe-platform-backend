@@ -2,7 +2,6 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Create a comment
 export async function createComment(data: {
 	content: string;
 	authorId: string;
@@ -14,7 +13,6 @@ export async function createComment(data: {
 		throw new Error("Comment content cannot be empty");
 	}
 
-	// Check if recipe exists
 	const recipe = await prisma.recipe.findUnique({
 		where: { id: recipeId },
 	});
@@ -38,7 +36,6 @@ export async function createComment(data: {
 	return comment;
 }
 
-// Get comments for a recipe (with pagination)
 export async function getRecipeComments(
 	recipeId: string,
 	options?: {
@@ -70,7 +67,6 @@ export async function getRecipeComments(
 	return { comments, total };
 }
 
-// Update a comment
 export async function updateComment(
 	id: string,
 	userId: string,
@@ -80,7 +76,6 @@ export async function updateComment(
 		throw new Error("Comment content cannot be empty");
 	}
 
-	// Check if comment exists and user owns it
 	const comment = await prisma.comment.findUnique({
 		where: { id },
 	});
@@ -104,9 +99,7 @@ export async function updateComment(
 	});
 }
 
-// Delete a comment
 export async function deleteComment(id: string, userId: string) {
-	// Check if comment exists and user owns it
 	const comment = await prisma.comment.findUnique({
 		where: { id },
 	});
@@ -126,17 +119,27 @@ export async function deleteComment(id: string, userId: string) {
 	return { success: true };
 }
 
-// Get a single comment by ID
 export async function getCommentById(id: string) {
-	return await prisma.comment.findUnique({
-		where: { id },
-		include: {
-			author: {
-				select: { name: true, email: true },
+	try {
+		// Check if it's a valid UUID format
+		const uuidRegex =
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+		if (!uuidRegex.test(id)) {
+			throw new Error("Invalid comment ID format");
+		}
+
+		return await prisma.comment.findUnique({
+			where: { id },
+			include: {
+				author: {
+					select: { name: true, email: true },
+				},
+				recipe: {
+					select: { title: true },
+				},
 			},
-			recipe: {
-				select: { title: true },
-			},
-		},
-	});
+		});
+	} catch (error) {
+		return null;
+	}
 }

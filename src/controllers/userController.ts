@@ -54,7 +54,6 @@ export const createUser = async (req: Request, res: Response) => {
 	}
 
 	try {
-		// Check if user already exists
 		const existingUser = await User.getUserByEmail(email);
 		if (existingUser) {
 			return handleResponse(res, 409, "User with this email already exists");
@@ -87,7 +86,6 @@ export const updateUser = async (req: CustomRequest, res: Response) => {
 			return handleResponse(res, 404, "User not found");
 		}
 
-		// Check if email is being changed and if it's already taken
 		if (email && email !== user.email) {
 			const existingUser = await User.getUserByEmail(email);
 			if (existingUser) {
