@@ -1,9 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
-import Recipe, { type RecipeWithStats } from "../models/Recipe.js";
-import Rating from "../models/Rating.js";
-import Comment from "../models/Comment.js";
+import * as Recipe from "../models/Recipe.js";
+// import * as Rating from "../models/Rating.js";
+// import * as Comment from "../models/Comment.js";
 import cloudinary from "../config/cloudinary.js";
-import { normalizeTextList, formatId } from "../lib/formatter.js";
+import { normalizeTextList } from "../lib/formatter.js";
 import type { UploadApiResponse } from "cloudinary";
 
 interface AuthRequest extends Request {
@@ -23,7 +23,7 @@ export const fetchRecipes = async (
 			minRating,
 			page = "1",
 			limit = "10",
-			sortBy = "created_at",
+			sortBy = "createdAt",
 			sortOrder = "desc",
 		} = req.query;
 
@@ -31,7 +31,7 @@ export const fetchRecipes = async (
 		const limitNum = parseInt(limit as string) || 10;
 
 		// Parse preparation time filter
-		let maxPrepTime: number = 0;
+		let maxPrepTime: number | undefined;
 		if (preparationTime) {
 			switch (preparationTime) {
 				case "0-30":
@@ -49,28 +49,23 @@ export const fetchRecipes = async (
 			}
 		}
 
-		const { recipes, total } = await Recipe.findAll({
+		const result = await Recipe.getRecipes({
 			page: pageNum,
 			limit: limitNum,
-			sortBy: sortBy as string,
-			sortOrder: sortOrder as "asc" | "desc",
-			authorId: parseInt(authorId as string),
-			isPublished: true,
-			minRating: parseFloat(minRating as string),
-			maxPrepTime,
+			authorId: authorId as string,
 			search: search as string,
+			isPublished: true,
+			// maxPrepTime
+			// minRating: minRating ? parseFloat(minRating as string) : undefined,
 		});
 
-		// Format recipes to convert id to _id
-		const formattedRecipes = formatId(recipes);
-
 		res.status(200).json({
-			data: formattedRecipes,
+			data: result.recipes,
 			pagination: {
 				page: pageNum,
 				limit: limitNum,
-				total,
-				pages: Math.ceil(total / limitNum),
+				total: result.total,
+				pages: Math.ceil(result.total / limitNum),
 			},
 		});
 	} catch (error) {
@@ -78,47 +73,37 @@ export const fetchRecipes = async (
 	}
 };
 
-export const fetchRecipe = async (
-	req: AuthRequest,
-	res: Response,
-	next: NextFunction,
-) => {
-	try {
-		const { id } = req.params;
-		const recipeId = id as string;
+// export const fetchRecipe = async (
+// 	req: AuthRequest,
+// 	res: Response,
+// 	next: NextFunction,
+// ) => {
+// 	try {
+// 		const { id } = req.params;
 
-		const recipe = await Recipe.findById(recipeId);
-		if (!recipe) {
-			return res.status(404).json({ message: "Recipe not found" });
-		}
+// 		const recipe = await Recipe.getRecipeById(id as string);
+// 		if (!recipe) {
+// 			return res.status(404).json({ message: "Recipe not found" });
+// 		}
 
-		// Get rating stats
-		const ratingStats = await Rating.getAverageForRecipe(recipeId);
+// 		// Get rating stats
+// 		const ratingStats = await Rating.getRecipeAverageRating(id as string);
 
-		// Get comments
-		const { comments } = await Comment.findByRecipe(recipeId, { limit: 5 });
+// 		// Get comments
+// 		const { comments } = await Comment.getRecipeComments(id as string, {
+// 			limit: 5,
+// 		});
 
-		// Format comments to convert id to _id
-		const formattedComments = formatId(comments);
-
-		// Format the recipe data
-		const recipeData = {
-			...recipe.toJSON(),
-			authorName: (recipe as any).authorName,
-			authorEmail: (recipe as any).authorEmail,
-			ratingCount: ratingStats.count,
-			averageRating: ratingStats.average,
-			recentComments: formattedComments,
-		};
-
-		// Format the entire recipe object
-		const formattedRecipe = formatId(recipeData);
-
-		res.status(200).json(formattedRecipe);
-	} catch (error) {
-		next(error);
-	}
-};
+// 		res.status(200).json({
+// 			...recipe,
+// 			ratingCount: ratingStats.count,
+// 			averageRating: ratingStats.average,
+// 			recentComments: comments,
+// 		});
+// 	} catch (error) {
+// 		next(error);
+// 	}
+// };
 
 export const createRecipe = async (
 	req: AuthRequest,
@@ -181,7 +166,7 @@ export const createRecipe = async (
 			}
 		}
 
-		const newRecipe = await Recipe.create({
+		const newRecipe = await Recipe.createRecipe({
 			title,
 			ingredients: normalizedIngredients,
 			steps: normalizedSteps,
@@ -190,12 +175,9 @@ export const createRecipe = async (
 			authorId: userId,
 		});
 
-		// Format the recipe to convert id to _id
-		const formattedRecipe = formatId(newRecipe.toJSON());
-
 		res.status(201).json({
 			message: "Recipe created successfully",
-			recipe: formattedRecipe,
+			recipe: newRecipe,
 		});
 	} catch (error) {
 		if (error instanceof Error) {
@@ -210,334 +192,293 @@ export const createRecipe = async (
 	}
 };
 
-export const updateRecipe = async (
-	req: AuthRequest,
-	res: Response,
-	next: NextFunction,
-) => {
-	try {
-		const { id } = req.params;
-		const { title, ingredients, steps, preparationTime, isPublished } =
-			req.body;
-		const userId = req.user?.id;
+// export const updateRecipe = async (
+// 	req: AuthRequest,
+// 	res: Response,
+// 	next: NextFunction,
+// ) => {
+// 	try {
+// 		const { id } = req.params;
+// 		const { title, ingredients, steps, preparationTime, isPublished } =
+// 			req.body;
+// 		const userId = req.user?.id;
 
-		if (!userId) {
-			return res.status(401).json({ message: "Unauthorized" });
-		}
+// 		if (!userId) {
+// 			return res.status(401).json({ message: "Unauthorized" });
+// 		}
 
-		const recipeId = id as string;
-		let imageData: { url: string; publicId: string } | undefined;
+// 		let imageData: { url: string; publicId: string } | undefined;
 
-		if (req.file) {
-			// Get existing recipe to delete old image
-			const existingRecipe = await Recipe.findById(recipeId);
+// 		if (req.file) {
+// 			// Get existing recipe to delete old image
+// 			const existingRecipe = await Recipe.getRecipeById(id as string);
+// 			if (existingRecipe?.image?.publicId) {
+// 				try {
+// 					await cloudinary.uploader.destroy(existingRecipe.image.publicId);
+// 				} catch (err) {
+// 					console.error("Error deleting old image:", err);
+// 				}
+// 			}
 
-			if (existingRecipe?.image?.publicId) {
-				try {
-					await cloudinary.uploader.destroy(existingRecipe.image.publicId);
-				} catch (err) {
-					console.error("Error deleting old image:", err);
-				}
-			}
+// 			try {
+// 				const uploadResult = await new Promise<UploadApiResponse>(
+// 					(resolve, reject) => {
+// 						const uploadStream = cloudinary.uploader.upload_stream(
+// 							{
+// 								folder: "recipes",
+// 								resource_type: "image",
+// 								transformation: [
+// 									{ width: 1200, height: 800, crop: "limit" },
+// 									{ quality: "auto:good" },
+// 								],
+// 							},
+// 							(error, result) => {
+// 								if (error) return reject(error);
+// 								if (!result)
+// 									return reject(new Error("No result from Cloudinary"));
+// 								resolve(result);
+// 							},
+// 						);
 
-			try {
-				const uploadResult = await new Promise<UploadApiResponse>(
-					(resolve, reject) => {
-						const uploadStream = cloudinary.uploader.upload_stream(
-							{
-								folder: "recipes",
-								resource_type: "image",
-								transformation: [
-									{ width: 1200, height: 800, crop: "limit" },
-									{ quality: "auto:good" },
-								],
-							},
-							(error, result) => {
-								if (error) return reject(error);
-								if (!result)
-									return reject(new Error("No result from Cloudinary"));
-								resolve(result);
-							},
-						);
+// 						uploadStream.end(req.file?.buffer);
+// 					},
+// 				);
 
-						uploadStream.end(req.file?.buffer);
-					},
-				);
+// 				imageData = {
+// 					url: uploadResult.secure_url,
+// 					publicId: uploadResult.public_id,
+// 				};
+// 			} catch {
+// 				return res.status(500).json({
+// 					message: "Failed to upload image to Cloudinary",
+// 				});
+// 			}
+// 		}
 
-				imageData = {
-					url: uploadResult.secure_url,
-					publicId: uploadResult.public_id,
-				};
-			} catch {
-				return res.status(500).json({
-					message: "Failed to upload image to Cloudinary",
-				});
-			}
-		}
+// 		const updates: any = {};
+// 		if (title) updates.title = title;
+// 		if (ingredients) updates.ingredients = normalizeTextList(ingredients);
+// 		if (steps) updates.steps = normalizeTextList(steps);
+// 		if (preparationTime) updates.preparationTime = Number(preparationTime);
+// 		if (imageData) updates.image = imageData;
+// 		if (isPublished !== undefined) updates.isPublished = isPublished;
 
-		const updates: any = {};
-		if (title) updates.title = title;
-		if (ingredients) updates.ingredients = normalizeTextList(ingredients);
-		if (steps) updates.steps = normalizeTextList(steps);
-		if (preparationTime) updates.preparationTime = Number(preparationTime);
-		if (imageData) updates.image = imageData;
-		if (isPublished !== undefined) updates.isPublished = isPublished;
+// 		try {
+// 			const updatedRecipe = await Recipe.updateRecipe(
+// 				id as string,
+// 				userId,
+// 				updates,
+// 			);
 
-		try {
-			const updatedRecipe = await Recipe.update(recipeId, userId, updates);
+// 			res.status(200).json({
+// 				message: "Recipe updated successfully",
+// 				recipe: updatedRecipe,
+// 			});
+// 		} catch (error) {
+// 			if (error instanceof Error) {
+// 				if (error.message === "Unauthorized") {
+// 					return res.status(403).json({ message: error.message });
+// 				}
+// 				if (error.message === "Recipe not found") {
+// 					return res.status(404).json({ message: error.message });
+// 				}
+// 			}
+// 			throw error;
+// 		}
+// 	} catch (error) {
+// 		if (error instanceof Error) {
+// 			if (
+// 				error.message.includes("Title must be") ||
+// 				error.message.includes("Preparation time")
+// 			) {
+// 				return res.status(400).json({ message: error.message });
+// 			}
+// 		}
+// 		next(error);
+// 	}
+// };
 
-			if (!updatedRecipe) {
-				return res.status(404).json({ message: "Recipe not found" });
-			}
+// export const deleteRecipe = async (
+// 	req: AuthRequest,
+// 	res: Response,
+// 	next: NextFunction,
+// ) => {
+// 	try {
+// 		const { id } = req.params;
+// 		const userId = req.user?.id;
 
-			// Format the recipe to convert id to _id
-			const formattedRecipe = formatId(updatedRecipe.toJSON());
+// 		if (!userId) {
+// 			return res.status(401).json({ message: "Unauthorized" });
+// 		}
 
-			res.status(200).json({
-				message: "Recipe updated successfully",
-				recipe: formattedRecipe,
-			});
-		} catch (error) {
-			if (
-				error instanceof Error &&
-				error.message === "Unauthorized to update this recipe"
-			) {
-				return res.status(403).json({ message: error.message });
-			}
-			throw error;
-		}
-	} catch (error) {
-		if (error instanceof Error) {
-			if (
-				error.message.includes("Title must be") ||
-				error.message.includes("Preparation time")
-			) {
-				return res.status(400).json({ message: error.message });
-			}
-		}
-		next(error);
-	}
-};
+// 		// Get recipe to delete image from cloudinary
+// 		const recipe = await Recipe.getRecipeById(id as string);
+// 		if (!recipe) {
+// 			return res.status(404).json({ message: "Recipe not found" });
+// 		}
 
-export const deleteRecipe = async (
-	req: AuthRequest,
-	res: Response,
-	next: NextFunction,
-) => {
-	try {
-		const { id } = req.params;
-		const userId = req.user?.id;
+// 		if (recipe.image?.publicId) {
+// 			try {
+// 				await cloudinary.uploader.destroy(recipe.image.publicId);
+// 			} catch (deleteError) {
+// 				console.error("Error deleting image from Cloudinary:", deleteError);
+// 			}
+// 		}
 
-		if (!userId) {
-			return res.status(401).json({ message: "Unauthorized" });
-		}
+// 		try {
+// 			await Recipe.deleteRecipe(id as string, userId);
+// 			res.status(200).json({
+// 				message: "Recipe deleted successfully",
+// 			});
+// 		} catch (error) {
+// 			if (error instanceof Error) {
+// 				if (error.message === "Unauthorized") {
+// 					return res.status(403).json({ message: error.message });
+// 				}
+// 				if (error.message === "Recipe not found") {
+// 					return res.status(404).json({ message: error.message });
+// 				}
+// 			}
+// 			throw error;
+// 		}
+// 	} catch (error) {
+// 		next(error);
+// 	}
+// };
 
-		const recipeId = id as string;
+// export const rateRecipe = async (
+// 	req: AuthRequest,
+// 	res: Response,
+// 	next: NextFunction,
+// ) => {
+// 	try {
+// 		const { id } = req.params;
+// 		const { value } = req.body;
+// 		const userId = req.user?.id;
 
-		// Get recipe to delete image from cloudinary
-		const recipe = await Recipe.findById(recipeId);
-		if (!recipe) {
-			return res.status(404).json({ message: "Recipe not found" });
-		}
+// 		if (!userId) {
+// 			return res.status(401).json({ message: "Unauthorized" });
+// 		}
 
-		if (recipe.authorId !== userId) {
-			return res
-				.status(403)
-				.json({ message: "Unauthorized to delete this recipe" });
-		}
+// 		if (!value || value < 1 || value > 5) {
+// 			return res
+// 				.status(400)
+// 				.json({ message: "Rating value must be between 1 and 5" });
+// 		}
 
-		if (recipe.image?.publicId) {
-			try {
-				await cloudinary.uploader.destroy(recipe.image.publicId);
-			} catch (deleteError) {
-				console.error("Error deleting image from Cloudinary:", deleteError);
-			}
-		}
+// 		const recipe = await Recipe.getRecipeById(id as string);
+// 		if (!recipe) {
+// 			return res.status(404).json({ message: "Recipe not found" });
+// 		}
 
-		try {
-			const deleted = await Recipe.delete(recipeId, userId);
+// 		try {
+// 			const rating = await Rating.createRating({
+// 				value,
+// 				authorId: userId,
+// 				recipeId: id as string,
+// 			});
 
-			if (!deleted) {
-				return res.status(404).json({ message: "Recipe not found" });
-			}
+// 			res.status(201).json({
+// 				message: "Recipe rated successfully",
+// 				rating,
+// 			});
+// 		} catch (error) {
+// 			if (
+// 				error instanceof Error &&
+// 				error.message === "User has already rated this recipe"
+// 			) {
+// 				return res.status(400).json({ message: error.message });
+// 			}
+// 			throw error;
+// 		}
+// 	} catch (error) {
+// 		next(error);
+// 	}
+// };
 
-			res.status(200).json({
-				message: "Recipe deleted successfully",
-			});
-		} catch (error) {
-			if (
-				error instanceof Error &&
-				error.message === "Unauthorized to delete this recipe"
-			) {
-				return res.status(403).json({ message: error.message });
-			}
-			throw error;
-		}
-	} catch (error) {
-		next(error);
-	}
-};
+// export const fetchRecipeComments = async (
+// 	req: AuthRequest,
+// 	res: Response,
+// 	next: NextFunction,
+// ) => {
+// 	try {
+// 		const { id } = req.params;
+// 		const { page = "1", limit = "10" } = req.query;
 
-export const rateRecipe = async (
-	req: AuthRequest,
-	res: Response,
-	next: NextFunction,
-) => {
-	try {
-		const { id } = req.params;
-		const { value } = req.body;
-		const userId = req.user?.id;
+// 		const pageNum = Math.max(1, parseInt(page as string));
+// 		const limitNum = Math.max(1, parseInt(limit as string));
 
-		if (!userId) {
-			return res.status(401).json({ message: "Unauthorized" });
-		}
+// 		const { comments, total } = await Comment.getRecipeComments(id as string, {
+// 			page: pageNum,
+// 			limit: limitNum,
+// 		});
 
-		const recipeId = id as string;
+// 		const totalPages = Math.ceil(total / limitNum);
 
-		if (!value || value < 1 || value > 5) {
-			return res
-				.status(400)
-				.json({ message: "Rating value must be between 1 and 5" });
-		}
+// 		res.status(200).json({
+// 			comments,
+// 			pagination: {
+// 				page: pageNum,
+// 				totalPages,
+// 				totalComments: total,
+// 				hasNext: pageNum < totalPages,
+// 				hasPrev: pageNum > 1,
+// 				limit: limitNum,
+// 			},
+// 		});
+// 	} catch (error) {
+// 		next(error);
+// 	}
+// };
 
-		const recipe = await Recipe.findById(recipeId);
-		if (!recipe) {
-			return res.status(404).json({ message: "Recipe not found" });
-		}
+// export const addCommentToRecipe = async (
+// 	req: AuthRequest,
+// 	res: Response,
+// 	next: NextFunction,
+// ) => {
+// 	try {
+// 		const { id } = req.params;
+// 		const { content } = req.body;
+// 		const userId = req.user?.id;
 
-		try {
-			const rating = await Rating.create({
-				value,
-				authorId: userId,
-				recipeId,
-			});
+// 		if (!userId) {
+// 			return res.status(401).json({ message: "Unauthorized" });
+// 		}
 
-			// Format the rating to convert id to _id
-			const formattedRating = formatId({
-				id: rating.id,
-				value: rating.value,
-				authorId: rating.authorId,
-				recipeId: rating.recipeId,
-				createdAt: rating.createdAt,
-			});
+// 		if (!content || content.trim().length === 0) {
+// 			return res.status(400).json({ message: "Content is required" });
+// 		}
 
-			res.status(201).json({
-				message: "Recipe rated successfully",
-				rating: formattedRating,
-			});
-		} catch (error) {
-			if (
-				error instanceof Error &&
-				error.message === "User has already rated this recipe"
-			) {
-				return res.status(400).json({ message: error.message });
-			}
-			throw error;
-		}
-	} catch (error) {
-		next(error);
-	}
-};
+// 		const recipe = await Recipe.getRecipeById(id as string);
+// 		if (!recipe) {
+// 			return res.status(404).json({ message: "Recipe not found" });
+// 		}
 
-export const fetchRecipeComments = async (
-	req: AuthRequest,
-	res: Response,
-	next: NextFunction,
-) => {
-	try {
-		const { id } = req.params;
-		const {
-			page = "1",
-			limit = "10",
-			sortBy = "created_at",
-			sortOrder = "desc",
-		} = req.query;
+// 		// Check if user already commented
+// 		const existingComments = await Comment.getRecipeComments(id as string, {
+// 			limit: 100,
+// 		});
+// 		const hasCommented = existingComments.comments.some(
+// 			(c: any) => c.authorId === userId,
+// 		);
 
-		const recipeId = id as string;
-		const pageNum = Math.max(1, parseInt(page as string));
-		const limitNum = Math.max(1, parseInt(limit as string));
+// 		if (hasCommented) {
+// 			return res
+// 				.status(400)
+// 				.json({ message: "You have already commented on this recipe" });
+// 		}
 
-		const { comments, total } = await Comment.findByRecipe(recipeId, {
-			page: pageNum,
-			limit: limitNum,
-			sortBy: sortBy as string,
-			sortOrder: sortOrder as "asc" | "desc",
-		});
+// 		const comment = await Comment.createComment({
+// 			content,
+// 			authorId: userId,
+// 			recipeId: id as string,
+// 		});
 
-		// Format comments to convert id to _id
-		const formattedComments = formatId(comments);
-
-		const totalPages = Math.ceil(total / limitNum);
-
-		res.status(200).json({
-			comments: formattedComments,
-			pagination: {
-				page: pageNum,
-				totalPages,
-				totalComments: total,
-				hasNext: pageNum < totalPages,
-				hasPrev: pageNum > 1,
-				limit: limitNum,
-			},
-		});
-	} catch (error) {
-		next(error);
-	}
-};
-
-export const addCommentToRecipe = async (
-	req: AuthRequest,
-	res: Response,
-	next: NextFunction,
-) => {
-	try {
-		const { id } = req.params;
-		const { content } = req.body;
-		const userId = req.user?.id;
-
-		if (!userId) {
-			return res.status(401).json({ message: "Unauthorized" });
-		}
-
-		const recipeId = id as string;
-
-		if (!content || content.trim().length === 0) {
-			return res.status(400).json({ message: "Content is required" });
-		}
-
-		const recipe = await Recipe.findById(recipeId);
-		if (!recipe) {
-			return res.status(404).json({ message: "Recipe not found" });
-		}
-
-		// Check if user already commented (optional - you can remove this if you want multiple comments)
-		const existingComments = await Comment.findByRecipe(recipeId, {
-			limit: 100,
-		});
-		const hasCommented = existingComments.comments.some(
-			(c) => c.author_id === userId,
-		);
-
-		if (hasCommented) {
-			return res
-				.status(400)
-				.json({ message: "You have already commented on this recipe" });
-		}
-
-		const comment = await Comment.create({
-			content,
-			authorId: userId,
-			recipeId,
-		});
-
-		// Format the comment to convert id to _id
-		const formattedComment = formatId(comment);
-
-		res.status(201).json({
-			message: "Comment added successfully",
-			comment: formattedComment,
-		});
-	} catch (error) {
-		next(error);
-	}
-};
+// 		res.status(201).json({
+// 			message: "Comment added successfully",
+// 			comment,
+// 		});
+// 	} catch (error) {
+// 		next(error);
+// 	}
+// };

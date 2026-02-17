@@ -55,7 +55,7 @@ describe("Recipes API", () => {
 			error: testRes.body?.error,
 		});
 
-		recipeId = testRes.body.recipe?._id;
+		recipeId = testRes.body.recipe?.id;
 	});
 
 	describe("Recipe CRUD Operations", () => {
@@ -83,7 +83,7 @@ describe("Recipes API", () => {
 			});
 
 			if (res.status === 201 || res.status === 200) {
-				recipeId = res.body.recipe?._id;
+				recipeId = res.body.recipe?.id;
 				expect(res.body.message).toMatch(/created|success/i);
 			} else {
 				console.error("Recipe creation failed:", res.body);
@@ -109,7 +109,7 @@ describe("Recipes API", () => {
 			if (!recipeId) {
 				const allRes = await request(app).get("/api/v1/recipes");
 				if (allRes.body.data && allRes.body.data.length > 0) {
-					recipeId = allRes.body.data[0]._id;
+					recipeId = allRes.body.data[0].id;
 				} else {
 					const createRes = await request(app)
 						.post("/api/v1/recipes")
@@ -122,7 +122,7 @@ describe("Recipes API", () => {
 						});
 
 					if (createRes.status === 201 || createRes.status === 200) {
-						recipeId = createRes.body.recipe._id;
+						recipeId = createRes.body.recipe.id;
 					}
 				}
 			}
@@ -136,7 +136,7 @@ describe("Recipes API", () => {
 				});
 
 				if (res.status === 200) {
-					expect(res.body._id).toBe(recipeId);
+					expect(res.body.id).toBe(recipeId);
 				} else if (res.status === 404) {
 					console.log("Recipe not found");
 				} else if (res.status === 400) {
@@ -197,7 +197,7 @@ describe("Recipes API", () => {
 			});
 
 			if (createRes.status === 201 || createRes.status === 200) {
-				const deleteRecipeId = createRes.body.recipe._id;
+				const deleteRecipeId = createRes.body.recipe.id;
 
 				const deleteRes = await request(app)
 					.delete(`/api/v1/recipes/${deleteRecipeId}`)
@@ -272,7 +272,7 @@ describe("Recipes API", () => {
 					preparationTime: 15,
 				});
 
-			const freshRecipeId = freshRecipeRes.body.recipe._id;
+			const freshRecipeId = freshRecipeRes.body.recipe.id;
 			console.log("Created fresh recipe for duplicate test:", freshRecipeId);
 
 			const firstRating = await request(app)
@@ -325,7 +325,7 @@ describe("Recipes API", () => {
 					preparationTime: 10,
 				});
 
-			const freshRecipeId = freshRecipeRes.body.recipe._id;
+			const freshRecipeId = freshRecipeRes.body.recipe.id;
 
 			const res = await request(app)
 				.post(`/api/v1/recipes/${freshRecipeId}/rate`)
@@ -399,7 +399,7 @@ describe("Recipes API", () => {
 					preparationTime: 20,
 				});
 
-			const freshRecipeId = freshRecipeRes.body.recipe._id;
+			const freshRecipeId = freshRecipeRes.body.recipe.id;
 
 			const user3Res = await request(app)
 				.post("/api/v1/auth/signup")
@@ -459,7 +459,7 @@ describe("Recipes API", () => {
 				});
 
 			expect(freshRecipeRes.status).toBe(201);
-			const freshRecipeId = freshRecipeRes.body.recipe._id;
+			const freshRecipeId = freshRecipeRes.body.recipe.id;
 			console.log("Created fresh recipe for duplicate test:", freshRecipeId);
 			console.log("Adding comment to recipe:", recipeId);
 
@@ -503,7 +503,7 @@ describe("Recipes API", () => {
 				});
 
 			expect(freshRecipeRes.status).toBe(201);
-			const freshRecipeId = freshRecipeRes.body.recipe._id;
+			const freshRecipeId = freshRecipeRes.body.recipe.id;
 			console.log("Created fresh recipe for duplicate test:", freshRecipeId);
 
 			const firstComment = await request(app)
@@ -559,7 +559,7 @@ describe("Recipes API", () => {
 				});
 
 			expect(freshRecipeRes.status).toBe(201);
-			const freshRecipeId = freshRecipeRes.body.recipe._id;
+			const freshRecipeId = freshRecipeRes.body.recipe.id;
 
 			const user3Res = await request(app)
 				.post("/api/v1/auth/signup")
@@ -599,8 +599,8 @@ describe("Recipes API", () => {
 			expect(comment2.status).toBe(201);
 
 			if (comment1.body.comment.author && comment2.body.comment.author) {
-				expect(comment1.body.comment.author._id).not.toBe(
-					comment2.body.comment.author._id,
+				expect(comment1.body.comment.author.id).not.toBe(
+					comment2.body.comment.author.id,
 				);
 			} else {
 				console.log(
@@ -636,8 +636,8 @@ describe("Recipes API", () => {
 			expect(recipe1Res.status).toBe(201);
 			expect(recipe2Res.status).toBe(201);
 
-			const recipe1Id = recipe1Res.body.recipe._id;
-			const recipe2Id = recipe2Res.body.recipe._id;
+			const recipe1Id = recipe1Res.body.recipe.id;
+			const recipe2Id = recipe2Res.body.recipe.id;
 
 			const comment1 = await request(app)
 				.post(`/api/v1/recipes/${recipe1Id}/comments`)
@@ -708,7 +708,7 @@ describe("Recipes API", () => {
 				});
 
 			expect(paginationRecipeRes.status).toBe(201);
-			const paginationRecipeId = paginationRecipeRes.body.recipe._id;
+			const paginationRecipeId = paginationRecipeRes.body.recipe.id;
 
 			await request(app)
 				.post(`/api/v1/recipes/${paginationRecipeId}/comments`)

@@ -1,466 +1,214 @@
-import pool from "../config/db.js";
+import { PrismaClient } from "@prisma/client";
 
-// Type definitions
-export interface RecipeData {
+const prisma = new PrismaClient();
+
+// Simple create function
+
+export async function getRecipes(options?: {
+	page?: number;
+	limit?: number;
+	authorId?: string;
+	search?: string;
+	isPublished?: boolean;
+}) {
+	const page = options?.page || 1;
+	const limit = options?.limit || 10;
+	const skip = (page - 1) * limit;
+
+	const where: any = { isPublished: options?.isPublished ?? true };
+
+	if (options?.authorId) {
+		where.authorId = options.authorId;
+	}
+
+	if (options?.search) {
+		where.OR = [
+			{ title: { contains: options.search, mode: "insensitive" } },
+			{ ingredients: { has: options.search } },
+		];
+	}
+
+	const [recipes, total] = await Promise.all([
+		prisma.recipe.findMany({
+			where,
+			include: {
+				author: { select: { name: true, email: true } },
+				ratings: { select: { value: true } },
+			},
+			orderBy: { createdAt: "desc" },
+			skip,
+			take: limit,
+		}),
+		prisma.recipe.count({ where }),
+	]);
+
+	// Add rating info to each recipe
+	const recipesWithRating = recipes.map((recipe: any) => {
+		const ratings = recipe.ratings as any[];
+		const ratingCount = ratings.length;
+		const averageRating = ratingCount
+			? Number(
+					(ratings.reduce((sum, r) => sum + r.value, 0) / ratingCount).toFixed(
+						1,
+					),
+				)
+			: 0;
+
+		return {
+			...recipe,
+			averageRating,
+			ratingCount,
+		};
+	});
+
+	return {
+		recipes: recipesWithRating,
+		total,
+		page,
+		totalPages: Math.ceil(total / limit),
+	};
+}
+
+export async function createRecipe(data: {
 	title: string;
 	ingredients: string[];
 	steps: string[];
 	preparationTime: number;
-	image?: {
-		url: string;
-		publicId: string;
-	};
+	image?: { url: string; publicId: string };
 	authorId: string;
 	isPublished?: boolean;
+}) {
+	// Simple validation
+	if (data.title.length < 3 || data.title.length > 100) {
+		throw new Error("Title must be between 3 and 100 characters");
+	}
+	if (data.preparationTime < 1 || data.preparationTime > 1440) {
+		throw new Error("Preparation time must be between 1 and 1440 minutes");
+	}
+
+	const recipe = await prisma.recipe.create({
+		data: {
+			title: data.title,
+			ingredients: data.ingredients,
+			steps: data.steps,
+			preparationTime: data.preparationTime,
+			imageUrl: data.image?.url ?? null,
+			imagePublicId: data.image?.publicId ?? null,
+			authorId: data.authorId,
+			isPublished: data.isPublished ?? true,
+		},
+		include: {
+			author: {
+				select: { name: true, email: true },
+			},
+		},
+	});
+
+	return recipe;
 }
 
-export interface RecipeRow {
-	id: string;
-	title: string;
-	ingredients: string[];
-	steps: string[];
-	preparation_time: number;
-	image_url: string | null;
-	image_public_id: string | null;
-	author_id: string;
-	is_published: boolean;
-	created_at: Date;
-	updated_at: Date;
-}
+// // Simple find by id
+// export async function getRecipeById(id: string) {
+// 	const recipe = await prisma.recipe.findUnique({
+// 		where: { id },
+// 		include: {
+// 			author: {
+// 				select: { name: true, email: true },
+// 			},
+// 			ratings: true,
+// 		},
+// 	});
 
-export interface RecipeWithAuthor extends RecipeRow {
-	author_name: string;
-	author_email: string;
-}
+// 	if (!recipe) return null;
 
-export interface RecipeWithStats extends RecipeWithAuthor {
-	rating_count: number;
-	average_rating: number;
-}
+// 	// Calculate average rating
+// 	const ratings = recipe.ratings as any[];
+// 	const ratingCount = ratings.length;
+// 	const averageRating = ratingCount
+// 		? Number(
+// 				(ratings.reduce((sum, r) => sum + r.value, 0) / ratingCount).toFixed(1),
+// 			)
+// 		: 0;
 
-// Recipe model class
-class Recipe {
-	public id: string;
-	public title: string;
-	public ingredients: string[];
-	public steps: string[];
-	public preparationTime: number;
-	public image: { url: string | null; publicId: string | null };
-	public authorId: string;
-	public isPublished: boolean;
-	public createdAt: Date;
-	public updatedAt: Date;
+// 	return {
+// 		...recipe,
+// 		averageRating,
+// 		ratingCount,
+// 	};
+// }
 
-	constructor(data: RecipeRow) {
-		this.id = data.id;
-		this.title = data.title;
-		this.ingredients = data.ingredients;
-		this.steps = data.steps;
-		this.preparationTime = data.preparation_time;
-		this.image = {
-			url: data.image_url,
-			publicId: data.image_public_id,
-		};
-		this.authorId = data.author_id;
-		this.isPublished = data.is_published;
-		this.createdAt = data.created_at;
-		this.updatedAt = data.updated_at;
-	}
+// // Simple find all with filters
 
-	static async create(recipeData: RecipeData): Promise<Recipe> {
-		const {
-			title,
-			ingredients,
-			steps,
-			preparationTime,
-			image = { url: "", publicId: "" },
-			authorId,
-			isPublished = true,
-		} = recipeData;
+// // Simple update
+// export async function updateRecipe(
+// 	id: string,
+// 	userId: string,
+// 	data: Partial<{
+// 		title: string;
+// 		ingredients: string[];
+// 		steps: string[];
+// 		preparationTime: number;
+// 		image: { url: string; publicId: string };
+// 		isPublished: boolean;
+// 	}>,
+// ) {
+// 	// Check ownership
+// 	const recipe = await prisma.recipe.findUnique({ where: { id } });
+// 	if (!recipe) throw new Error("Recipe not found");
+// 	if (recipe.authorId !== userId) throw new Error("Unauthorized");
 
-		// Validate
-		if (title.length < 3 || title.length > 100) {
-			throw new Error("Title must be between 3 and 100 characters");
-		}
-		if (preparationTime < 1 || preparationTime > 1440) {
-			throw new Error("Preparation time must be between 1 and 1440 minutes");
-		}
+// 	// Prepare update data
+// 	const updateData: any = {};
+// 	if (data.title) updateData.title = data.title;
+// 	if (data.ingredients) updateData.ingredients = data.ingredients;
+// 	if (data.steps) updateData.steps = data.steps;
+// 	if (data.preparationTime) updateData.preparationTime = data.preparationTime;
+// 	if (data.image) {
+// 		updateData.imageUrl = data.image.url;
+// 		updateData.imagePublicId = data.image.publicId;
+// 	}
+// 	if (data.isPublished !== undefined) updateData.isPublished = data.isPublished;
 
-		// Check if author exists
-		const authorCheck = await pool.query("SELECT id FROM users WHERE id = $1", [
-			authorId,
-		]);
-		if (authorCheck.rows.length === 0) {
-			throw new Error("Author not found");
-		}
+// 	return await prisma.recipe.update({
+// 		where: { id },
+// 		data: updateData,
+// 		include: {
+// 			author: { select: { name: true, email: true } },
+// 		},
+// 	});
+// }
 
-		const result = await pool.query<RecipeRow>(
-			`INSERT INTO recipes (
-        title, ingredients, steps, preparation_time, 
-        image_url, image_public_id, author_id, is_published
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-      RETURNING *`,
-			[
-				title,
-				ingredients,
-				steps,
-				preparationTime,
-				image.url || null,
-				image.publicId || null,
-				authorId,
-				isPublished,
-			],
-		);
+// // Simple delete
+// export async function deleteRecipe(id: string, userId: string) {
+// 	const recipe = await prisma.recipe.findUnique({ where: { id } });
+// 	if (!recipe) throw new Error("Recipe not found");
+// 	if (recipe.authorId !== userId) throw new Error("Unauthorized");
 
-		return new Recipe(result.rows[0] as RecipeRow);
-	}
+// 	await prisma.recipe.delete({ where: { id } });
+// 	return { success: true };
+// }
 
-	static async findById(
-		id: string,
-	): Promise<(Recipe & { authorName?: string; authorEmail?: string }) | null> {
-		const result = await pool.query<RecipeWithAuthor>(
-			`SELECT r.*, u.name as author_name, u.email as author_email 
-       FROM recipes r
-       JOIN users u ON r.author_id = u.id
-       WHERE r.id = $1`,
-			[id],
-		);
+// // Simple get recipes by user
+// export async function getUserRecipes(userId: string) {
+// 	return await prisma.recipe.findMany({
+// 		where: { authorId: userId },
+// 		include: {
+// 			ratings: { select: { value: true } },
+// 		},
+// 		orderBy: { createdAt: "desc" },
+// 	});
+// }
 
-		if (!result.rows[0]) return null;
+// // Simple get recipe rating
+// export async function getRecipeRating(recipeId: string) {
+// 	const ratings = await prisma.rating.aggregate({
+// 		where: { recipeId },
+// 		_avg: { value: true },
+// 		_count: { value: true },
+// 	});
 
-		const recipe = new Recipe(result.rows[0]);
-		return Object.assign(recipe, {
-			authorName: result.rows[0].author_name,
-			authorEmail: result.rows[0].author_email,
-		});
-	}
-
-	static async findAll(
-		options: {
-			page?: number;
-			limit?: number;
-			sortBy?: string;
-			sortOrder?: "asc" | "desc";
-			authorId?: number;
-			isPublished?: boolean;
-			minRating?: number;
-			maxPrepTime?: number;
-			search?: string;
-		} = {},
-	): Promise<{ recipes: RecipeWithStats[]; total: number }> {
-		const {
-			page = 1,
-			limit = 10,
-			sortBy = "created_at",
-			sortOrder = "desc",
-			authorId,
-			isPublished = true,
-			minRating,
-			maxPrepTime,
-			search,
-		} = options;
-
-		const offset = (page - 1) * limit;
-		const params: any[] = [];
-		let paramIndex = 1;
-
-		// Build WHERE clause
-		const conditions: string[] = [`r.is_published = $${paramIndex++}`];
-		params.push(isPublished);
-
-		if (authorId) {
-			conditions.push(`r.author_id = $${paramIndex++}`);
-			params.push(authorId);
-		}
-
-		if (maxPrepTime) {
-			conditions.push(`r.preparation_time <= $${paramIndex++}`);
-			params.push(maxPrepTime);
-		}
-
-		if (search) {
-			conditions.push(`(
-      r.title ILIKE $${paramIndex} OR 
-      $${paramIndex} = ANY(r.ingredients) OR
-      EXISTS (
-        SELECT 1 FROM users u 
-        WHERE u.id = r.author_id AND (u.name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})
-      )
-    )`);
-			params.push(`%${search}%`);
-			paramIndex++;
-		}
-
-		const whereClause =
-			conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-		// Validate sort column
-		const validSortColumns = [
-			"created_at",
-			"updated_at",
-			"title",
-			"preparation_time",
-			"average_rating",
-			"rating_count",
-		];
-
-		// Handle sorting by rating fields
-		let orderByClause: string;
-		if (sortBy === "average_rating" || sortBy === "rating_count") {
-			// These are aliases from the subquery, need to order by the actual column
-			orderByClause = `ORDER BY ${sortBy} ${sortOrder === "asc" ? "ASC" : "DESC"}`;
-		} else {
-			const sortColumn = validSortColumns.includes(sortBy)
-				? sortBy
-				: "created_at";
-			orderByClause = `ORDER BY ${sortColumn} ${sortOrder === "asc" ? "ASC" : "DESC"}`;
-		}
-
-		let query: string;
-		let countQuery: string;
-		let countParams: any[] = [];
-
-		if (minRating) {
-			// With rating filter
-			query = `
-      SELECT 
-        r.*,
-        u.name as author_name,
-        u.email as author_email,
-        COALESCE(ROUND(rs.avg_rating::numeric, 1), 0)::float as average_rating,
-        COALESCE(rs.rating_count, 0)::integer as rating_count
-      FROM recipes r
-      JOIN users u ON r.author_id = u.id
-      LEFT JOIN (
-        SELECT 
-          recipe_id, 
-          AVG(value)::float as avg_rating, 
-          COUNT(*)::integer as rating_count
-        FROM ratings
-        GROUP BY recipe_id
-      ) rs ON r.id = rs.recipe_id
-      ${whereClause}
-      AND (rs.avg_rating >= $${paramIndex} OR rs.avg_rating IS NULL AND 0 >= $${paramIndex})
-      ${orderByClause}
-      LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}
-    `;
-
-			countQuery = `
-      SELECT COUNT(*)::integer as total
-      FROM recipes r
-      LEFT JOIN (
-        SELECT 
-          recipe_id, 
-          AVG(value)::float as avg_rating
-        FROM ratings
-        GROUP BY recipe_id
-      ) rs ON r.id = rs.recipe_id
-      ${whereClause}
-      AND (rs.avg_rating >= $1 OR rs.avg_rating IS NULL AND 0 >= $1)
-    `;
-
-			params.push(minRating, limit, offset);
-
-			// Build count params
-			countParams = [minRating];
-			if (authorId) countParams.push(authorId);
-			if (maxPrepTime) countParams.push(maxPrepTime);
-			if (search) countParams.push(`%${search}%`);
-
-			paramIndex += 3;
-		} else {
-			// Without rating filter
-			query = `
-      SELECT 
-        r.*,
-        u.name as author_name,
-        u.email as author_email,
-        COALESCE(ROUND(rs.avg_rating::numeric, 1), 0)::float as average_rating,
-        COALESCE(rs.rating_count, 0)::integer as rating_count
-      FROM recipes r
-      JOIN users u ON r.author_id = u.id
-      LEFT JOIN (
-        SELECT 
-          recipe_id, 
-          AVG(value)::float as avg_rating, 
-          COUNT(*)::integer as rating_count
-        FROM ratings
-        GROUP BY recipe_id
-      ) rs ON r.id = rs.recipe_id
-      ${whereClause}
-      ${orderByClause}
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-
-			countQuery = `
-      SELECT COUNT(*)::integer as total
-      FROM recipes r
-      ${whereClause}
-    `;
-
-			params.push(limit, offset);
-
-			// Build count params (all params except limit and offset)
-			countParams = params.slice(0, -2);
-			paramIndex += 2;
-		}
-
-		const result = await pool.query<RecipeWithStats>(query, params);
-
-		// Ensure all numeric fields are proper numbers
-		const recipes = result.rows.map((recipe) => {
-			// Create a properly typed recipe object
-			const typedRecipe = {
-				...recipe,
-				id: recipe.id,
-				preparation_time: Number(recipe.preparation_time),
-				author_id: recipe.author_id,
-				average_rating: recipe.average_rating
-					? Number(recipe.average_rating)
-					: 0,
-				rating_count: recipe.rating_count ? Number(recipe.rating_count) : 0,
-				created_at: new Date(recipe.created_at),
-				updated_at: new Date(recipe.updated_at),
-			};
-
-			// Remove any potential string values
-			return typedRecipe as unknown as RecipeWithStats;
-		});
-
-		// Get total count for pagination - ensure it's a number
-		const countResult = await pool.query(countQuery, countParams);
-		const total = Number(countResult.rows[0]?.total) || 0;
-
-		return {
-			recipes,
-			total,
-		};
-	}
-
-	static async update(
-		id: string,
-		userId: string,
-		updates: Partial<Omit<RecipeData, "authorId">>,
-	): Promise<Recipe | null> {
-		// Check ownership
-		const recipe = await this.findById(id);
-		if (!recipe) return null;
-		if (recipe.authorId !== userId) {
-			throw new Error("Unauthorized to update this recipe");
-		}
-
-		const fields: string[] = [];
-		const values: any[] = [];
-		let paramIndex = 1;
-
-		if (updates.title !== undefined) {
-			if (updates.title.length < 3 || updates.title.length > 100) {
-				throw new Error("Title must be between 3 and 100 characters");
-			}
-			fields.push(`title = $${paramIndex++}`);
-			values.push(updates.title);
-		}
-
-		if (updates.ingredients !== undefined) {
-			fields.push(`ingredients = $${paramIndex++}`);
-			values.push(updates.ingredients);
-		}
-
-		if (updates.steps !== undefined) {
-			fields.push(`steps = $${paramIndex++}`);
-			values.push(updates.steps);
-		}
-
-		if (updates.preparationTime !== undefined) {
-			if (updates.preparationTime < 1 || updates.preparationTime > 1440) {
-				throw new Error("Preparation time must be between 1 and 1440 minutes");
-			}
-			fields.push(`preparation_time = $${paramIndex++}`);
-			values.push(updates.preparationTime);
-		}
-
-		if (updates.image !== undefined) {
-			fields.push(
-				`image_url = $${paramIndex++}, image_public_id = $${paramIndex++}`,
-			);
-			values.push(updates.image?.url || null, updates.image?.publicId || null);
-		}
-
-		if (updates.isPublished !== undefined) {
-			fields.push(`is_published = $${paramIndex++}`);
-			values.push(updates.isPublished);
-		}
-
-		if (fields.length === 0) {
-			return recipe;
-		}
-
-		values.push(id);
-		const result = await pool.query<RecipeRow>(
-			`UPDATE recipes SET ${fields.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
-			values,
-		);
-
-		return result.rows[0] ? new Recipe(result.rows[0]) : null;
-	}
-
-	static async delete(id: string, userId: string): Promise<boolean> {
-		// Check ownership
-		const recipe = await this.findById(id);
-		if (!recipe) return false;
-		if (recipe.authorId !== userId) {
-			throw new Error("Unauthorized to delete this recipe");
-		}
-
-		// Delete recipe (cascade will handle comments and ratings)
-		const result = await pool.query(
-			"DELETE FROM recipes WHERE id = $1 RETURNING id",
-			[id],
-		);
-
-		return (result.rowCount ?? 0) > 0;
-	}
-
-	static async getRecipesByUser(userId: string): Promise<Recipe[]> {
-		const result = await pool.query<RecipeRow>(
-			"SELECT * FROM recipes WHERE author_id = $1 ORDER BY created_at DESC",
-			[userId],
-		);
-		return result.rows.map((row) => new Recipe(row));
-	}
-
-	static async getAverageRating(
-		recipeId: string,
-	): Promise<{ average: number; count: number }> {
-		const result = await pool.query(
-			`SELECT 
-        COALESCE(AVG(value), 0) as average,
-        COUNT(*) as count
-       FROM ratings 
-       WHERE recipe_id = $1`,
-			[recipeId],
-		);
-
-		return {
-			average: parseFloat(result.rows[0].average) || 0,
-			count: parseInt(result.rows[0].count) || 0,
-		};
-	}
-
-	toJSON() {
-		return {
-			id: this.id,
-			title: this.title,
-			ingredients: this.ingredients,
-			steps: this.steps,
-			preparationTime: this.preparationTime,
-			image: this.image,
-			authorId: this.authorId,
-			isPublished: this.isPublished,
-			createdAt: this.createdAt,
-			updatedAt: this.updatedAt,
-		};
-	}
-}
-
-export default Recipe;
+// 	return {
+// 		average: ratings._avg.value || 0,
+// 		count: ratings._count.value || 0,
+// 	};
+// }

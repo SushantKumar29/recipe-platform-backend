@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import Comment from "../models/Comment.js";
-import { formatId } from "../lib/formatter.js";
+import * as Comment from "../models/Comment.js";
 
 interface AuthRequest extends Request {
 	user?: { id: string };
@@ -30,25 +29,24 @@ export const updateComment = async (
 		}
 
 		try {
-			const updatedComment = await Comment.update(commentId, userId, content);
-
-			if (!updatedComment) {
-				return res.status(404).json({ message: "Comment not found" });
-			}
-
-			// Format comment to convert id to _id
-			const formattedComment = formatId(updatedComment);
+			const updatedComment = await Comment.updateComment(
+				commentId,
+				userId,
+				content,
+			);
 
 			res.status(200).json({
 				message: "Comment updated successfully",
-				comment: formattedComment,
+				comment: updatedComment,
 			});
 		} catch (error) {
-			if (
-				error instanceof Error &&
-				error.message === "Unauthorized to update this comment"
-			) {
-				return res.status(403).json({ message: error.message });
+			if (error instanceof Error) {
+				if (error.message === "Unauthorized to update this comment") {
+					return res.status(403).json({ message: error.message });
+				}
+				if (error.message === "Comment not found") {
+					return res.status(404).json({ message: error.message });
+				}
 			}
 			throw error;
 		}
@@ -76,19 +74,17 @@ export const deleteComment = async (
 		}
 
 		try {
-			const deleted = await Comment.delete(commentId, userId);
-
-			if (!deleted) {
-				return res.status(404).json({ message: "Comment not found" });
-			}
+			await Comment.deleteComment(commentId, userId);
 
 			res.status(200).json({ message: "Comment deleted successfully" });
 		} catch (error) {
-			if (
-				error instanceof Error &&
-				error.message === "Unauthorized to delete this comment"
-			) {
-				return res.status(403).json({ message: error.message });
+			if (error instanceof Error) {
+				if (error.message === "Unauthorized to delete this comment") {
+					return res.status(403).json({ message: error.message });
+				}
+				if (error.message === "Comment not found") {
+					return res.status(404).json({ message: error.message });
+				}
 			}
 			throw error;
 		}

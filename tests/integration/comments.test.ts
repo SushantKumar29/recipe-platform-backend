@@ -54,7 +54,7 @@ describe("Comments API", () => {
 		});
 
 		expect(recipeRes.status).toBe(201);
-		recipeId = recipeRes.body.recipe._id;
+		recipeId = recipeRes.body.recipe.id;
 
 		const commentRes = await request(app)
 			.post(`/api/v1/recipes/${recipeId}/comments`)
@@ -68,7 +68,7 @@ describe("Comments API", () => {
 		});
 
 		expect(commentRes.status).toBe(201);
-		commentId = commentRes.body.comment._id;
+		commentId = commentRes.body.comment.id;
 	});
 
 	const setAuth = (req: Test, token: string) => {
@@ -94,7 +94,7 @@ describe("Comments API", () => {
 				return;
 			}
 
-			const freshCommentId = freshCommentRes.body.comment._id;
+			const freshCommentId = freshCommentRes.body.comment.id;
 
 			const res = await setAuth(
 				request(app).put(`/api/v1/comments/${freshCommentId}`),
@@ -125,7 +125,7 @@ describe("Comments API", () => {
 				return;
 			}
 
-			const freshCommentId = freshCommentRes.body.comment._id;
+			const freshCommentId = freshCommentRes.body.comment.id;
 
 			const res = await setAuth(
 				request(app).put(`/api/v1/comments/${freshCommentId}`),
@@ -155,7 +155,7 @@ describe("Comments API", () => {
 				return;
 			}
 
-			const freshCommentId = freshCommentRes.body.comment._id;
+			const freshCommentId = freshCommentRes.body.comment.id;
 
 			const res = await setAuth(
 				request(app).put(`/api/v1/comments/${freshCommentId}`),
@@ -207,7 +207,7 @@ describe("Comments API", () => {
 				return;
 			}
 
-			const newCommentId = newCommentRes.body.comment._id;
+			const newCommentId = newCommentRes.body.comment.id;
 
 			const res = await setAuth(
 				request(app).put(`/api/v1/comments/${newCommentId}`),
@@ -246,7 +246,7 @@ describe("Comments API", () => {
 				return;
 			}
 
-			const freshCommentId = freshCommentRes.body.comment._id;
+			const freshCommentId = freshCommentRes.body.comment.id;
 			const longContent = "a".repeat(501);
 
 			const res = await setAuth(
@@ -302,7 +302,7 @@ describe("Comments API", () => {
 				return;
 			}
 
-			const deleteCommentId = newCommentRes.body.comment._id;
+			const deleteCommentId = newCommentRes.body.comment.id;
 
 			const res = await setAuth(
 				request(app).delete(`/api/v1/comments/${deleteCommentId}`),
@@ -354,7 +354,7 @@ describe("Comments API", () => {
 				return;
 			}
 
-			const testCommentId = newCommentRes.body.comment._id;
+			const testCommentId = newCommentRes.body.comment.id;
 
 			const res = await setAuth(
 				request(app).delete(`/api/v1/comments/${testCommentId}`),

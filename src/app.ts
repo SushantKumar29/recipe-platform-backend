@@ -5,10 +5,10 @@ import cookieParser from "cookie-parser";
 import requestLogger from "./middleware/requestLogger.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
-import authRoutes from "./routes/authRoutes.js";
-import usersRoutes from "./routes/usersRoutes.js";
+// import authRoutes from "./routes/authRoutes.js";
+// import usersRoutes from "./routes/usersRoutes.js";
 import recipesRoutes from "./routes/recipesRoutes.js";
-import commentsRoutes from "./routes/commentsRoutes.js";
+// import commentsRoutes from "./routes/commentsRoutes.js";
 
 import swagger from "./swagger.js";
 import rateLimiter from "./middleware/rateLimiter.js";
@@ -40,8 +40,8 @@ app.get("/pg", async (req, res) => {
 	}
 });
 
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/users", usersRoutes);
+// app.use("/api/v1/auth", authRoutes);
+// app.use("/api/v1/users", usersRoutes);
 app.use("/api/v1/recipes", recipesRoutes);
 // app.use("/api/v1/comments", commentsRoutes);
 app.use("/api-docs", swagger);

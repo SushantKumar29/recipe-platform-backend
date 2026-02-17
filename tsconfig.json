@@ -5,12 +5,14 @@
 		"outDir": "./dist",
 
 		/* Module System */
-		"module": "NodeNext",
-		"moduleResolution": "NodeNext",
+		// "module": "NodeNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		// "moduleResolution": "NodeNext",
 
 		/* Target & Runtime */
-		"target": "ES2022",
-		"lib": ["ES2022"],
+		"target": "ES2023",
+		"lib": ["ES2023"],
 
 		/* Node Environment */
 		"types": ["node", "jest"],

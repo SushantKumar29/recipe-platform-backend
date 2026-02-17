@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
-import User from "../models/User.js";
-import { formatId } from "../lib/formatter.js";
+import * as User from "../models/User.js";
 
 interface CustomRequest extends Request {
 	params: {
@@ -22,10 +21,8 @@ const handleResponse = (
 
 export const fetchUsers = async (req: Request, res: Response) => {
 	try {
-		const users = await User.findAll();
-		// Format users to convert id to _id
-		const formattedUsers = formatId(users.map((user) => user.toJSON()));
-		handleResponse(res, 200, "Users fetched successfully", formattedUsers);
+		const users = await User.getAllUsers();
+		handleResponse(res, 200, "Users fetched successfully", users);
 	} catch (error) {
 		handleResponse(res, 500, "Error fetching users", error);
 	}
@@ -39,13 +36,11 @@ export const fetchUser = async (req: CustomRequest, res: Response) => {
 	}
 
 	try {
-		const user = await User.findById(id);
+		const user = await User.getUserById(id);
 		if (!user) {
 			return handleResponse(res, 404, "User not found");
 		}
-		// Format user to convert id to _id
-		const formattedUser = formatId(user.toJSON());
-		handleResponse(res, 200, "User fetched successfully", formattedUser);
+		handleResponse(res, 200, "User fetched successfully", user);
 	} catch (error) {
 		handleResponse(res, 500, "Error fetching user", error);
 	}
@@ -60,15 +55,13 @@ export const createUser = async (req: Request, res: Response) => {
 
 	try {
 		// Check if user already exists
-		const existingUser = await User.findByEmail(email);
+		const existingUser = await User.getUserByEmail(email);
 		if (existingUser) {
 			return handleResponse(res, 409, "User with this email already exists");
 		}
 
-		const user = await User.create({ name, email, password, image });
-		// Format user to convert id to _id
-		const formattedUser = formatId(user.toJSON());
-		handleResponse(res, 201, "User created successfully", formattedUser);
+		const user = await User.createUser({ name, email, password, image });
+		handleResponse(res, 201, "User created successfully", user);
 	} catch (error) {
 		if (
 			error instanceof Error &&
@@ -89,14 +82,14 @@ export const updateUser = async (req: CustomRequest, res: Response) => {
 	}
 
 	try {
-		const user = await User.findById(id);
+		const user = await User.getUserById(id);
 		if (!user) {
 			return handleResponse(res, 404, "User not found");
 		}
 
 		// Check if email is being changed and if it's already taken
 		if (email && email !== user.email) {
-			const existingUser = await User.findByEmail(email);
+			const existingUser = await User.getUserByEmail(email);
 			if (existingUser) {
 				return handleResponse(res, 409, "Email is already in use");
 			}
@@ -111,11 +104,12 @@ export const updateUser = async (req: CustomRequest, res: Response) => {
 		if (email) updates.email = email;
 		if (image !== undefined) updates.image = image;
 
-		const updatedUser = await User.update(id, updates);
-		// Format user to convert id to _id
-		const formattedUser = formatId(updatedUser?.toJSON());
-		handleResponse(res, 200, "User updated successfully", formattedUser);
+		const updatedUser = await User.updateUser(id, updates);
+		handleResponse(res, 200, "User updated successfully", updatedUser);
 	} catch (error) {
+		if (error instanceof Error && error.message === "User not found") {
+			return handleResponse(res, 404, error.message);
+		}
 		handleResponse(res, 500, "Error updating user", error);
 	}
 };
@@ -128,12 +122,12 @@ export const deleteUser = async (req: CustomRequest, res: Response) => {
 	}
 
 	try {
-		const user = await User.findById(id);
+		const user = await User.getUserById(id);
 		if (!user) {
 			return handleResponse(res, 404, "User not found");
 		}
 
-		const deleted = await User.delete(id);
+		const deleted = await User.deleteUser(id);
 		if (deleted) {
 			handleResponse(res, 200, "User deleted successfully");
 		} else {

@@ -2,14 +2,14 @@ import dotenv from "dotenv";
 
 import config from "./config/config.js";
 import app from "./app.js";
-import { dbInitializer } from "./config/dbInit.ts";
+// import { dbInitializer } from "./config/dbInit.ts";
 
 dotenv.config({ quiet: true });
 
 async function startServer() {
 	try {
 		// Initialize all database tables at once
-		await dbInitializer.initializeAllTables();
+		// await dbInitializer.initializeAllTables();
 
 		// Start server
 		app.listen(config.port, () => {

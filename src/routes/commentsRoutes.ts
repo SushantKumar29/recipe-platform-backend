@@ -1,11 +1,11 @@
 import express from "express";
-import {
-	deleteComment,
-	updateComment,
-} from "../controllers/commentsController.js";
-import { requireAuth } from "../middleware/auth.js";
-// import { checkOwnership } from "../middleware/ownership.ts";
-// import Comment from "../models/Comment.js";
+// import {
+// 	deleteComment,
+// 	updateComment,
+// } from "../controllers/commentsController.js";
+// import { requireAuth } from "../middleware/auth.js";
+// // import { checkOwnership } from "../middleware/ownership.ts";
+// // import Comment from "../models/Comment.js";
 
 const router = express.Router();
 
@@ -67,12 +67,13 @@ const router = express.Router();
  *       500:
  *         description: Internal server error
  */
-router.put(
-	"/:id",
-	requireAuth,
-	// checkOwnership(Comment),
-	updateComment,
-);
+
+// router.put(
+// 	"/:id",
+// 	requireAuth,
+// 	// checkOwnership(Comment),
+// 	updateComment,
+// );
 
 /**
  * @swagger
@@ -97,11 +98,12 @@ router.put(
  *       404:
  *         description: Comment not found
  */
-router.delete(
-	"/:id",
-	requireAuth,
-	// checkOwnership(Comment),
-	deleteComment,
-);
+
+// router.delete(
+// 	"/:id",
+// 	requireAuth,
+// 	// checkOwnership(Comment),
+// 	deleteComment,
+// );
 
 export default router;

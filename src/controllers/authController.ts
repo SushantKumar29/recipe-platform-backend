@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import User from "../models/User.js";
-import { formatId } from "../lib/formatter.js";
+import * as User from "../models/User.js";
 
 interface AuthRequest extends Request {
 	body: {
@@ -39,13 +38,13 @@ export const signup = async (req: AuthRequest, res: Response) => {
 
 	try {
 		// Check if user already exists
-		const existingUser = await User.findByEmail(email);
+		const existingUser = await User.getUserByEmail(email);
 		if (existingUser) {
 			return handleResponse(res, 409, "User with this email already exists");
 		}
 
 		// Create new user
-		const user = await User.create({ name, email, password });
+		const user = await User.createUser({ name, email, password });
 
 		// Generate JWT token
 		const token = generateToken(user.id);
@@ -58,11 +57,8 @@ export const signup = async (req: AuthRequest, res: Response) => {
 			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 		});
 
-		// Format user to convert id to _id
-		const formattedUser = formatId(user.toJSON());
-
 		handleResponse(res, 201, "User created successfully", {
-			user: formattedUser,
+			user,
 			token,
 		});
 	} catch (error) {
@@ -87,13 +83,13 @@ export const login = async (req: AuthRequest, res: Response) => {
 
 	try {
 		// Find user by email
-		const user = await User.findByEmail(email);
+		const user = await User.getUserByEmail(email);
 		if (!user) {
 			return handleResponse(res, 401, "Invalid credentials");
 		}
 
 		// Compare password
-		const isPasswordValid = await user.comparePassword(password);
+		const isPasswordValid = await User.comparePassword(user, password);
 		if (!isPasswordValid) {
 			return handleResponse(res, 401, "Invalid credentials");
 		}
@@ -109,11 +105,8 @@ export const login = async (req: AuthRequest, res: Response) => {
 			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 		});
 
-		// Format user to convert id to _id
-		const formattedUser = formatId(user.toJSON());
-
 		handleResponse(res, 200, "Login successful", {
-			user: formattedUser,
+			user,
 			token,
 		});
 	} catch (error) {
@@ -138,7 +131,7 @@ export const logout = async (req: Request, res: Response) => {
 	}
 };
 
-// Optional: Get current user profile
+// Get current user profile
 export const getCurrentUser = async (
 	req: Request & { user?: { id: string } },
 	res: Response,
@@ -148,16 +141,13 @@ export const getCurrentUser = async (
 			return handleResponse(res, 401, "Not authenticated");
 		}
 
-		const user = await User.findById(req.user.id);
+		const user = await User.getUserById(req.user.id);
 		if (!user) {
 			return handleResponse(res, 404, "User not found");
 		}
 
-		// Format user to convert id to _id
-		const formattedUser = formatId(user.toJSON());
-
 		handleResponse(res, 200, "User profile fetched successfully", {
-			user: formattedUser,
+			user,
 		});
 	} catch (error) {
 		console.error("Get current user error:", error);
