@@ -1,5 +1,5 @@
-import express from "express";
-import { login, logout, signup } from "../controllers/authController.js";
+import express from 'express';
+import { login, logout, signup } from '../controllers/authController.js';
 
 const router = express.Router();
 
@@ -41,7 +41,7 @@ const router = express.Router();
  *         description: Internal server error
  */
 
-router.post("/signup", signup);
+router.post('/signup', signup);
 
 /**
  * @swagger
@@ -80,7 +80,7 @@ router.post("/signup", signup);
  *         description: Invalid credentials
  */
 
-router.post("/login", login);
+router.post('/login', login);
 
 /**
  * @swagger
@@ -98,6 +98,6 @@ router.post("/login", login);
  *         description: Not authenticated
  */
 
-router.post("/logout", logout);
+router.post('/logout', logout);
 
 export default router;

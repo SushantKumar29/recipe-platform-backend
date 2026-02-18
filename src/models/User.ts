@@ -1,95 +1,92 @@
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcrypt";
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 export interface UserData {
-	name: string;
-	email: string;
-	password: string;
-	image?: string;
+  name: string;
+  email: string;
+  password: string;
+  image?: string;
 }
 
 export async function getAllUsers() {
-	const users = await prisma.user.findMany({
-		orderBy: { createdAt: "desc" },
-	});
-	return users;
+  const users = await prisma.user.findMany({
+    orderBy: { createdAt: 'desc' },
+  });
+  return users;
 }
 
 export async function getUserById(id: string) {
-	return await prisma.user.findUnique({
-		where: { id },
-	});
+  return await prisma.user.findUnique({
+    where: { id },
+  });
 }
 
 export async function getUserByEmail(email: string) {
-	return await prisma.user.findUnique({
-		where: { email },
-	});
+  return await prisma.user.findUnique({
+    where: { email },
+  });
 }
 
 export async function createUser(data: UserData) {
-	const { name, email, password, image } = data;
+  const { name, email, password, image } = data;
 
-	if (!password || password.length < 8) {
-		throw new Error("Password must be at least 8 characters long");
-	}
+  if (!password || password.length < 8) {
+    throw new Error('Password must be at least 8 characters long');
+  }
 
-	const existingUser = await getUserByEmail(email);
-	if (existingUser) {
-		throw new Error("User with this email already exists");
-	}
+  const existingUser = await getUserByEmail(email);
+  if (existingUser) {
+    throw new Error('User with this email already exists');
+  }
 
-	const hashedPassword = await bcrypt.hash(password, 12);
+  const hashedPassword = await bcrypt.hash(password, 12);
 
-	const user = await prisma.user.create({
-		data: {
-			name,
-			email,
-			password: hashedPassword,
-			image: image || null,
-		},
-	});
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      password: hashedPassword,
+      image: image || null,
+    },
+  });
 
-	return user;
+  return user;
 }
 
-export async function updateUser(
-	id: string,
-	updates: Partial<Omit<UserData, "password">>,
-) {
-	const existingUser = await getUserById(id);
-	if (!existingUser) {
-		throw new Error("User not found");
-	}
+export async function updateUser(id: string, updates: Partial<Omit<UserData, 'password'>>) {
+  const existingUser = await getUserById(id);
+  if (!existingUser) {
+    throw new Error('User not found');
+  }
 
-	if (updates.email && updates.email !== existingUser.email) {
-		const userWithEmail = await getUserByEmail(updates.email);
-		if (userWithEmail) {
-			throw new Error("Email is already in use");
-		}
-	}
+  if (updates.email && updates.email !== existingUser.email) {
+    const userWithEmail = await getUserByEmail(updates.email);
+    if (userWithEmail) {
+      throw new Error('Email is already in use');
+    }
+  }
 
-	const user = await prisma.user.update({
-		where: { id },
-		data: updates,
-	});
+  const user = await prisma.user.update({
+    where: { id },
+    data: updates,
+  });
 
-	return user;
+  return user;
 }
 
 export async function deleteUser(id: string) {
-	try {
-		await prisma.user.delete({
-			where: { id },
-		});
-		return true;
-	} catch {
-		return false;
-	}
+  try {
+    await prisma.user.delete({
+      where: { id },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export async function comparePassword(user: any, candidatePassword: string) {
-	return bcrypt.compare(candidatePassword, user.password);
+export async function comparePassword(user: UserData, candidatePassword: string) {
+  return bcrypt.compare(candidatePassword, user.password);
 }

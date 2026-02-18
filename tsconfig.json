@@ -1,43 +1,43 @@
 {
-	"compilerOptions": {
-		/* Project Structure */
-		"rootDir": "./src",
-		"outDir": "./dist",
+  "compilerOptions": {
+    /* Project Structure */
+    "rootDir": "./src",
+    "outDir": "./dist",
 
-		/* Module System */
-		// "module": "NodeNext",
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		// "moduleResolution": "NodeNext",
+    /* Module System */
+    // "module": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // "moduleResolution": "NodeNext",
 
-		/* Target & Runtime */
-		"target": "ES2023",
-		"lib": ["ES2023"],
+    /* Target & Runtime */
+    "target": "ES2023",
+    "lib": ["ES2023"],
 
-		/* Node Environment */
-		"types": ["node", "jest"],
+    /* Node Environment */
+    "types": ["node", "jest"],
 
-		/* Output */
-		"sourceMap": true,
-		"noEmit": true,
+    /* Output */
+    "sourceMap": true,
+    "noEmit": true,
 
-		/* Type Safety */
-		"strict": true,
-		"noUncheckedIndexedAccess": true,
-		"exactOptionalPropertyTypes": true,
-		"allowImportingTsExtensions": true,
+    /* Type Safety */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "allowImportingTsExtensions": true,
 
-		/* ESM Compatibility */
-		"verbatimModuleSyntax": true,
-		"isolatedModules": true,
+    /* ESM Compatibility */
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
 
-		/* Performance */
-		"skipLibCheck": true,
-		"esModuleInterop": true
-	},
+    /* Performance */
+    "skipLibCheck": true,
+    "esModuleInterop": true
+  },
 
-	"include": ["src/**/*.ts"],
-	"exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }
 
 // {

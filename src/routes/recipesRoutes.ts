@@ -1,17 +1,17 @@
-import express from "express";
+import express from 'express';
 import {
-	fetchRecipes,
-	fetchRecipe,
-	createRecipe,
-	updateRecipe,
-	deleteRecipe,
-	rateRecipe,
-	addCommentToRecipe,
-	fetchRecipeComments,
-} from "../controllers/recipesController.js";
-import { requireAuth } from "../middleware/auth.js";
-import { checkOwnership } from "../middleware/ownership.ts";
-import { uploadSingleImage } from "../middleware/upload.ts";
+  fetchRecipes,
+  fetchRecipe,
+  createRecipe,
+  updateRecipe,
+  deleteRecipe,
+  rateRecipe,
+  addCommentToRecipe,
+  fetchRecipeComments,
+} from '../controllers/recipesController.js';
+import { requireAuth } from '../middleware/auth.js';
+import { checkOwnership } from '../middleware/ownership.ts';
+import { uploadSingleImage } from '../middleware/upload.ts';
 
 const router = express.Router();
 
@@ -109,7 +109,7 @@ const router = express.Router();
  *       500:
  *         description: Internal server error
  */
-router.get("/", fetchRecipes);
+router.get('/', fetchRecipes);
 
 /**
  * @swagger
@@ -130,7 +130,7 @@ router.get("/", fetchRecipes);
  *       404:
  *         description: Recipe not found
  */
-router.get("/:id", fetchRecipe);
+router.get('/:id', fetchRecipe);
 
 /**
  * @swagger
@@ -166,7 +166,7 @@ router.get("/:id", fetchRecipe);
  *       404:
  *         description: Recipe not found
  */
-router.get("/:id/comments", fetchRecipeComments);
+router.get('/:id/comments', fetchRecipeComments);
 
 /**
  * @swagger
@@ -206,7 +206,7 @@ router.get("/:id/comments", fetchRecipeComments);
  *       201:
  *         description: Recipe created successfully
  */
-router.post("/", requireAuth, uploadSingleImage, createRecipe);
+router.post('/', requireAuth, uploadSingleImage, createRecipe);
 
 /**
  * @swagger
@@ -250,11 +250,11 @@ router.post("/", requireAuth, uploadSingleImage, createRecipe);
  */
 
 router.put(
-	"/:id",
-	requireAuth,
-	checkOwnership("recipe", "authorId"),
-	uploadSingleImage,
-	updateRecipe,
+  '/:id',
+  requireAuth,
+  checkOwnership('recipe', 'authorId'),
+  uploadSingleImage,
+  updateRecipe,
 );
 
 /**
@@ -281,12 +281,7 @@ router.put(
  *         description: Recipe not found
  */
 
-router.delete(
-	"/:id",
-	requireAuth,
-	checkOwnership("recipe", "authorId"),
-	deleteRecipe,
-);
+router.delete('/:id', requireAuth, checkOwnership('recipe', 'authorId'), deleteRecipe);
 
 /**
  * @swagger
@@ -327,7 +322,7 @@ router.delete(
  *         description: Recipe not found
  */
 
-router.post("/:id/rate", requireAuth, rateRecipe);
+router.post('/:id/rate', requireAuth, rateRecipe);
 
 /**
  * @swagger
@@ -365,6 +360,6 @@ router.post("/:id/rate", requireAuth, rateRecipe);
  *         description: Recipe not found
  */
 
-router.post("/:id/comments", requireAuth, addCommentToRecipe);
+router.post('/:id/comments', requireAuth, addCommentToRecipe);
 
 export default router;

@@ -1,10 +1,7 @@
-import express from "express";
-import {
-	deleteComment,
-	updateComment,
-} from "../controllers/commentsController.js";
-import { requireAuth } from "../middleware/auth.js";
-import { checkOwnership } from "../middleware/ownership.ts";
+import express from 'express';
+import { deleteComment, updateComment } from '../controllers/commentsController.js';
+import { requireAuth } from '../middleware/auth.js';
+import { checkOwnership } from '../middleware/ownership.ts';
 
 const router = express.Router();
 
@@ -67,12 +64,7 @@ const router = express.Router();
  *         description: Internal server error
  */
 
-router.put(
-	"/:id",
-	requireAuth,
-	checkOwnership("comment", "authorId"),
-	updateComment,
-);
+router.put('/:id', requireAuth, checkOwnership('comment', 'authorId'), updateComment);
 
 /**
  * @swagger
@@ -98,11 +90,6 @@ router.put(
  *         description: Comment not found
  */
 
-router.delete(
-	"/:id",
-	requireAuth,
-	checkOwnership("comment", "authorId"),
-	deleteComment,
-);
+router.delete('/:id', requireAuth, checkOwnership('comment', 'authorId'), deleteComment);
 
 export default router;
