@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import * as User from '../models/User.js';
+import { createSecretToken } from '../lib/secretToken.js';
 
 interface AuthRequest extends Request {
   body: {
@@ -23,12 +23,6 @@ const handleResponse = (
   });
 };
 
-const generateToken = (userId: string): string => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'fallback_secret', {
-    expiresIn: '7d',
-  });
-};
-
 export const signup = async (req: AuthRequest, res: Response) => {
   const { name, email, password } = req.body;
 
@@ -44,7 +38,7 @@ export const signup = async (req: AuthRequest, res: Response) => {
 
     const user = await User.createUser({ name, email, password });
 
-    const token = generateToken(user.id);
+    const token = createSecretToken(user.id);
 
     res.cookie('token', token, {
       httpOnly: true,
@@ -79,7 +73,7 @@ export const login = async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.getUserByEmail(email);
     if (!user) {
-      return handleResponse(res, 401, 'Invalid credentials');
+      return handleResponse(res, 404, 'You are not registered');
     }
 
     const isPasswordValid = await User.comparePassword(user as User.UserData, password);
@@ -87,7 +81,7 @@ export const login = async (req: AuthRequest, res: Response) => {
       return handleResponse(res, 401, 'Invalid credentials');
     }
 
-    const token = generateToken(user.id);
+    const token = createSecretToken(user.id);
 
     res.cookie('token', token, {
       httpOnly: true,

@@ -55,7 +55,6 @@ describe('Recipes API', () => {
     return res.body.token;
   }
 
-  // Helper to create a recipe with the same data that works in CRUD tests
   async function createTestRecipe(token: string) {
     const res = await request(app)
       .post('/api/v1/recipes')

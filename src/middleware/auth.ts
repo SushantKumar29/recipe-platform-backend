@@ -5,7 +5,6 @@ interface JwtPayload {
   id: string;
 }
 
-// Use module augmentation instead of namespace
 declare module 'express' {
   interface Request {
     user?: JwtPayload;
@@ -23,7 +22,6 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 
     if (!token && req.headers.cookie) {
       const cookies = req.headers.cookie as string;
-      // Fix cookie parsing - cookies usually come as "token=value"
       const cookieMatch = cookies.match(/token=([^;]+)/);
       if (cookieMatch) {
         token = cookieMatch[1];
@@ -34,7 +32,10 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as JwtPayload;
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || process.env.ACCESS_TOKEN || 'fallback_secret',
+    ) as JwtPayload;
 
     req.user = decoded;
     next();

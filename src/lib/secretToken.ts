@@ -1,8 +1,7 @@
 import jwt from 'jsonwebtoken';
-import type { Types } from 'mongoose';
 
-export const createSecretToken = (id: Types.ObjectId) => {
-  const secret = process.env.JWT_SECRET || process.env.ACCESS_TOKEN;
+export const createSecretToken = (id: string) => {
+  const secret = process.env.JWT_SECRET || process.env.ACCESS_TOKEN || 'fallback_secret';
 
   if (!secret) {
     console.warn('No JWT secret found in environment variables');
