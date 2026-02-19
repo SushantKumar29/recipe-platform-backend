@@ -38,6 +38,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     ) as JwtPayload;
 
     req.user = decoded;
+    res.locals.user = decoded;
     next();
   } catch (error) {
     console.error(error);

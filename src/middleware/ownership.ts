@@ -9,7 +9,7 @@ export const checkOwnership = (modelName: PrismaModel, fieldName = 'authorId') =
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const userId = res.locals.user?.id || req.params.userId;
+      const userId = res.locals.user?.id || req.user?.id || req.params.userId;
 
       if (!userId) {
         return res.status(401).json({ message: 'Unauthorized' });
